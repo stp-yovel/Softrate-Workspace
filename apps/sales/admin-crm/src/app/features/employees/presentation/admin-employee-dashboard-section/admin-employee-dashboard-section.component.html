@@ -18,6 +18,19 @@
                   <option *ngFor="let p of periods" [value]="p.key">{{ p.label }}</option>
                 </select>
               </label>
+
+              <ng-container *ngIf="selectedPeriod==='custom'">
+                <label class="mini-field">
+                  <span>From</span>
+                  <input class="field-input filter-date-field" type="date" [(ngModel)]="customFrom" [max]="todayIso" aria-label="Custom period from date">
+                </label>
+                <label class="mini-field">
+                  <span>To</span>
+                  <input class="field-input filter-date-field" type="date" [(ngModel)]="customTo" [min]="customFrom" [max]="todayIso" aria-label="Custom period to date">
+                </label>
+                <button class="primary-action admin-employee-apply-button" type="button" (click)="applyCustomRange()" [disabled]="!customFrom">Apply</button>
+              </ng-container>
+
               <button class="toolbar-button admin-employee-sync-button" type="button" (click)="syncEmployee()" [disabled]="syncEmpLoading" aria-label="Refresh employee data" title="Refresh employee data">
                 <svg viewBox="0 0 24 24" aria-hidden="true" [style.animation]="syncEmpLoading?'spin 0.8s linear infinite':''">
                   <path d="M4 4v6h6" /><path d="M20 20v-6h-6" /><path d="M20 9A8 8 0 0 0 6.3 4.7L4 10" /><path d="M4 15a8 8 0 0 0 13.7 4.3L20 14" />

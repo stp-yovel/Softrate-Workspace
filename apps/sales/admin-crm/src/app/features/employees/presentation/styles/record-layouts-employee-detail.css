@@ -177,6 +177,22 @@
   background: #ffffff !important;
 }
 
+.dashboard-wrapper .admin-employee-fullview-actions .filter-date-field {
+  min-width: 150px !important;
+  height: 48px !important;
+  min-height: 48px !important;
+  border-radius: 14px !important;
+  background: #ffffff !important;
+}
+
+.dashboard-wrapper .admin-employee-fullview-actions .admin-employee-apply-button {
+  height: 48px !important;
+  min-height: 48px !important;
+  padding: 0 20px !important;
+  border-radius: 14px !important;
+  font-weight: var(--font-weight-semibold, 600) !important;
+}
+
 .dashboard-wrapper .admin-employee-sync-button {
   width: 48px !important;
   min-width: 48px !important;
