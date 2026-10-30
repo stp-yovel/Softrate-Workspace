@@ -164,6 +164,86 @@
         </div>
       </div>
     </div>
+
+    <!-- Bank & Statutory Details (Employees Only) -->
+    <div class="flutter-card" *ngIf="role !== 'intern'">
+      <div class="section-title">
+        <div class="indicator"></div>
+        <h4>Bank & Statutory Details</h4>
+      </div>
+
+      <div class="info-list">
+        <div class="info-row">
+          <div class="info-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+          </div>
+          <div class="info-details">
+            <span class="label">PAN Number</span>
+            <span class="value" style="font-family: monospace; font-weight: 600;">{{ user?.panNumber || '-' }}</span>
+          </div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          </div>
+          <div class="info-details">
+            <span class="label">UAN Number (EPFO)</span>
+            <span class="value" style="font-family: monospace; font-weight: 600;">{{ user?.uanNumber || '-' }}</span>
+          </div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          </div>
+          <div class="info-details">
+            <span class="label">ESI Number</span>
+            <span class="value" style="font-family: monospace; font-weight: 600;">{{ user?.esiNumber || '-' }}</span>
+          </div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="12" x="2" y="6" rx="2"/><circle cx="12" cy="12" r="2"/><path d="M6 12h.01M18 12h.01"/></svg>
+          </div>
+          <div class="info-details">
+            <span class="label">Bank Name</span>
+            <span class="value">{{ user?.bankDetails?.bankName || '-' }}</span>
+          </div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
+          </div>
+          <div class="info-details">
+            <span class="label">Account Number</span>
+            <span class="value" style="font-family: monospace; font-weight: 600;">{{ user?.bankDetails?.accountNumber || '-' }}</span>
+          </div>
+        </div>
+
+        <div class="info-row">
+          <div class="info-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11M20 10v11M8 14v4M12 14v4M16 14v4"/></svg>
+          </div>
+          <div class="info-details">
+            <span class="label">IFSC Code</span>
+            <span class="value" style="font-family: monospace; font-weight: 600;">{{ user?.bankDetails?.ifscCode || '-' }}</span>
+          </div>
+        </div>
+
+        <div class="info-row" *ngIf="user?.bankDetails?.branchName">
+          <div class="info-icon">
+            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+          </div>
+          <div class="info-details">
+            <span class="label">Branch</span>
+            <span class="value">{{ user?.bankDetails?.branchName }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- Sticky Bottom Actions -->

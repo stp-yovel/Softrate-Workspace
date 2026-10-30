@@ -44,12 +44,24 @@ const EmployeeSchema = new mongoose.Schema({
   // Section 3 – CGPA / Marksheets
   ugCgpa: Number,
   pgCgpa: Number,
+  cgpaOrPercentage: { type: String, default: "" },
+  degree: { type: String, default: "" },
+  location: { type: String, default: "" },
+  countryCode: { type: String, default: "+91" },
+  jobId: { type: String, default: "" },
 
   // Section 4 – Experience (conditional)
   isExperienced: { type: Boolean, default: false },
   experienceYears: String,
   previousOrg: String,
   designation: String,
+  currentCtc: { type: Number, default: 0 },
+  expectedCtc: { type: Number, default: 0 },
+  noticePeriod: { type: Number, default: 0 },
+  joiningDate: { type: Date, default: null },
+
+  // Section 5 - Role Assessment Answers
+  assessmentAnswers: { type: mongoose.Schema.Types.Mixed, default: {} },
 
   // Remote Worker Flag
   isRemote: { type: Boolean, default: false },
@@ -64,11 +76,22 @@ const EmployeeSchema = new mongoose.Schema({
   isManager: { type: Boolean, default: false },
   isHr: { type: Boolean, default: false },
   assignedManager: { type: mongoose.Schema.Types.ObjectId, ref: "Employee", default: null },
-  managerApprovalStatus: { type: String, enum: ['pending', 'approved', 'rejected', null], default: null },
+  managerApprovalStatus: { type: String, enum: ['pending', 'approved', 'rejected', 'shortlist', 'shortlisted', 'maybe', null], default: null },
   managerRemarks: { type: String, default: "" },
   submittedAt: { type: Date, default: Date.now },
   terminationReason: { type: String, default: null },
   terminationDate: { type: Date, default: null },
+  // Statutory & Bank Details
+  panNumber: { type: String, default: "" },
+  uanNumber: { type: String, default: "" },
+  esiNumber: { type: String, default: "" },
+  bankDetails: {
+    bankName: { type: String, default: "" },
+    accountNumber: { type: String, default: "" },
+    ifscCode: { type: String, default: "" },
+    branchName: { type: String, default: "" },
+    accountHolderName: { type: String, default: "" }
+  },
   payroll: {
     basicSalary: { type: Number, default: 0 },
     hra: { type: Number, default: 0 },

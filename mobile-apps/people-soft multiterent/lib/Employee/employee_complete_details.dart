@@ -12,6 +12,7 @@ import 'package:hrmappfrontend/auth_client.dart' as http;
 class EmployeeCompleteDetails extends StatefulWidget {
   /// MongoDB _id of the employee record
   final String employeeMongoId;
+
   /// Called when the user successfully submits OR taps "Skip for now"
   final void Function(BuildContext) onDone;
 
@@ -66,7 +67,18 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
   File? experienceLetterFile;
   File? relievingLetterFile;
 
-  // SECTION 4 – Identification Documents
+  // SECTION 4 – Bank & Statutory Details
+  final TextEditingController panNumberController = TextEditingController();
+  final TextEditingController uanNumberController = TextEditingController();
+  final TextEditingController esiNumberController = TextEditingController();
+  final TextEditingController accountHolderNameController =
+      TextEditingController();
+  final TextEditingController bankNameController = TextEditingController();
+  final TextEditingController accountNumberController = TextEditingController();
+  final TextEditingController ifscCodeController = TextEditingController();
+  final TextEditingController branchNameController = TextEditingController();
+
+  // SECTION 5 – Identification Documents
   File? resumeFile;
   File? passportPhotoFile;
   File? aadhaarFile;
@@ -84,6 +96,14 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
     totalExperienceController.dispose();
     prevOrgController.dispose();
     prevDesignationController.dispose();
+    panNumberController.dispose();
+    uanNumberController.dispose();
+    esiNumberController.dispose();
+    accountHolderNameController.dispose();
+    bankNameController.dispose();
+    accountNumberController.dispose();
+    ifscCodeController.dispose();
+    branchNameController.dispose();
     super.dispose();
   }
 
@@ -120,13 +140,16 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
       }
 
       bool isDuplicate = allSelectedFiles.any(
-          (f) => f != null && f.path.split('/').last == selectedFileName);
+        (f) => f != null && f.path.split('/').last == selectedFileName,
+      );
 
       if (isDuplicate) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text("Please upload a relevant file. This file is already selected."),
+              content: Text(
+                "Please upload a relevant file. This file is already selected.",
+              ),
               backgroundColor: Colors.red,
             ),
           );
@@ -163,11 +186,24 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
       // Experience fields
       request.fields['isExperienced'] = isExperienced.toString();
       if (isExperienced) {
-        request.fields['experienceYears'] =
-            totalExperienceController.text.trim();
+        request.fields['experienceYears'] = totalExperienceController.text
+            .trim();
         request.fields['previousOrg'] = prevOrgController.text.trim();
         request.fields['designation'] = prevDesignationController.text.trim();
       }
+
+      // Bank & Statutory Details
+      request.fields['panNumber'] = panNumberController.text
+          .trim()
+          .toUpperCase();
+      request.fields['uanNumber'] = uanNumberController.text.trim();
+      request.fields['esiNumber'] = esiNumberController.text.trim();
+      request.fields['accountHolderName'] = accountHolderNameController.text
+          .trim();
+      request.fields['bankName'] = bankNameController.text.trim();
+      request.fields['accountNumber'] = accountNumberController.text.trim();
+      request.fields['ifscCode'] = ifscCodeController.text.trim().toUpperCase();
+      request.fields['branchName'] = branchNameController.text.trim();
 
       // File attachments
       Future<void> attach(File? f, String name) async {
@@ -209,8 +245,9 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
       } else {
         String errorMsg = "Submission failed";
         try {
-          final responseData =
-              jsonDecode(await response.stream.bytesToString());
+          final responseData = jsonDecode(
+            await response.stream.bytesToString(),
+          );
           errorMsg = responseData['message'] ?? errorMsg;
         } catch (_) {}
         ScaffoldMessenger.of(context).showSnackBar(
@@ -240,11 +277,7 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
         height: size.height,
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [
-              Color(0xFFFFA726),
-              Color(0xFF8ED1DC),
-              Color(0xFF00657F),
-            ],
+            colors: [Color(0xFFFFA726), Color(0xFF8ED1DC), Color(0xFF00657F)],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -310,8 +343,9 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
                           TextButton(
                             onPressed: () => widget.onDone(context),
                             style: TextButton.styleFrom(
-                              backgroundColor:
-                                  Colors.white.withValues(alpha: 0.15),
+                              backgroundColor: Colors.white.withValues(
+                                alpha: 0.15,
+                              ),
                               foregroundColor: Colors.white,
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 14,
@@ -397,8 +431,7 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
                             "Highest Qualification *",
                             highestQualification,
                             qualifications,
-                            (val) =>
-                                setState(() => highestQualification = val),
+                            (val) => setState(() => highestQualification = val),
                           ),
                           _inputField(
                             "Stream/Specialization *",
@@ -463,8 +496,7 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
                             icon: Icons.work_outline,
                           ),
                           Container(
-                            padding:
-                                const EdgeInsets.symmetric(horizontal: 8),
+                            padding: const EdgeInsets.symmetric(horizontal: 8),
                             decoration: BoxDecoration(
                               color: const Color(0xFFF7F9FC),
                               borderRadius: BorderRadius.circular(16),
@@ -537,6 +569,88 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
                             ),
                           ],
 
+                          // BANK & STATUTORY DETAILS
+                          _sectionHeader(
+                            "Bank & Statutory Details",
+                            icon: Icons.account_balance_outlined,
+                          ),
+                          _inputField(
+                            "PAN Card Number *",
+                            panNumberController,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[a-zA-Z0-9]'),
+                              ),
+                              LengthLimitingTextInputFormatter(10),
+                            ],
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) {
+                                return 'PAN Number is required';
+                              }
+                              if (val.trim().length != 10) {
+                                return 'Enter a valid 10-digit PAN';
+                              }
+                              return null;
+                            },
+                          ),
+                          _inputField(
+                            "UAN Number (EPFO, optional)",
+                            uanNumberController,
+                            type: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(12),
+                            ],
+                            validator: (_) => null,
+                          ),
+                          _inputField(
+                            "ESI Number (optional)",
+                            esiNumberController,
+                            type: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                              LengthLimitingTextInputFormatter(17),
+                            ],
+                            validator: (_) => null,
+                          ),
+                          _inputField(
+                            "Account Holder Name *",
+                            accountHolderNameController,
+                          ),
+                          _inputField("Bank Name *", bankNameController),
+                          _inputField(
+                            "Bank Account Number *",
+                            accountNumberController,
+                            type: TextInputType.number,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.digitsOnly,
+                            ],
+                          ),
+                          _inputField(
+                            "IFSC Code *",
+                            ifscCodeController,
+                            inputFormatters: [
+                              FilteringTextInputFormatter.allow(
+                                RegExp(r'[a-zA-Z0-9]'),
+                              ),
+                              LengthLimitingTextInputFormatter(11),
+                            ],
+                            validator: (val) {
+                              if (val == null || val.trim().isEmpty) {
+                                return 'IFSC Code is required';
+                              }
+                              if (val.trim().length != 11) {
+                                return 'Enter a valid 11-character IFSC Code';
+                              }
+                              return null;
+                            },
+                          ),
+                          _inputField(
+                            "Branch Name (optional)",
+                            branchNameController,
+                            validator: (_) => null,
+                          ),
+
                           // IDENTIFICATION DOCUMENTS
                           _sectionHeader(
                             "Identification Documents",
@@ -597,8 +711,8 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
                                         strokeWidth: 2,
                                         valueColor:
                                             AlwaysStoppedAnimation<Color>(
-                                          Colors.white,
-                                        ),
+                                              Colors.white,
+                                            ),
                                       ),
                                     )
                                   : const Text(
@@ -666,25 +780,24 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
   }
 
   InputDecoration _deco(String label) => InputDecoration(
-        labelText: label,
-        floatingLabelBehavior: FloatingLabelBehavior.auto,
-        filled: true,
-        fillColor: const Color(0xFFF7F9FC),
-        contentPadding:
-            const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: BorderSide.none,
-        ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFFE1E6F0)),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: Color(0xFF008C9E), width: 1.4),
-        ),
-      );
+    labelText: label,
+    floatingLabelBehavior: FloatingLabelBehavior.auto,
+    filled: true,
+    fillColor: const Color(0xFFF7F9FC),
+    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 14),
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: BorderSide.none,
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: Color(0xFFE1E6F0)),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: Color(0xFF008C9E), width: 1.4),
+    ),
+  );
 
   Widget _inputField(
     String label,
@@ -701,7 +814,8 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
         keyboardType: type,
         maxLines: maxLines,
         inputFormatters: inputFormatters,
-        validator: validator ??
+        validator:
+            validator ??
             (val) => val == null || val.trim().isEmpty
                 ? 'This field is required'
                 : null,
@@ -738,8 +852,9 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
     List<String> extensions, {
     bool required = true,
   }) {
-    final fileName =
-        file != null ? file.path.split('/').last : 'No file chosen';
+    final fileName = file != null
+        ? file.path.split('/').last
+        : 'No file chosen';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
@@ -761,9 +876,7 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
                   ? Icons.check_circle_outline
                   : Icons.upload_file_outlined,
               size: 18,
-              color: file != null
-                  ? const Color(0xFF008C9E)
-                  : Colors.grey[400],
+              color: file != null ? const Color(0xFF008C9E) : Colors.grey[400],
             ),
             const SizedBox(width: 8),
             Expanded(
@@ -805,7 +918,8 @@ class _EmployeeCompleteDetailsState extends State<EmployeeCompleteDetails> {
                   borderRadius: BorderRadius.circular(20),
                 ),
               ),
-              onPressed: () => pickFile(onPicked, file, allowedExtensions: extensions),
+              onPressed: () =>
+                  pickFile(onPicked, file, allowedExtensions: extensions),
               child: const Text(
                 "Choose",
                 style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),

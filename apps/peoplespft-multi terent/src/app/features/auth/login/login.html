@@ -1,63 +1,62 @@
 <div class="login-container">
   <!-- Left Branding Panel -->
   <div class="branding-panel">
-    <div class="branding-content">
+    <div class="branding-header">
       <div class="logo-container">
-        <img src="logo/peoplesoft.png" alt="peoplesoft Logo" class="brand-logo-img">
+        <img src="logo/peoplesoft.png" alt="PeopleSoft Logo" class="brand-logo-img">
         <div class="logo-text">PeopleSoft</div>
       </div>
       <span class="crm-tag">Workforce Management</span>
-      <h1>Empowering your team with smart automation.</h1>
-      <p class="branding-desc">Manage attendance, leave, and performance in one unified workspace.</p>
     </div>
-    <div class="branding-bg-circles">
-      <div class="circle circle-1"></div>
-      <div class="circle circle-2"></div>
+
+    <div class="branding-footer-content">
+      <h1>Run the whole organization from one place.</h1>
+      <p class="branding-desc">Empowering your team with smart automation. Manage attendance, leave, and performance in one unified workspace.</p>
     </div>
+
+    <!-- Constellation / network node graphics -->
+    <svg class="constellation-svg" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="40" y1="280" x2="110" y2="210" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+      <line x1="110" y1="210" x2="210" y2="250" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+      <line x1="110" y1="210" x2="150" y2="120" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+      <line x1="150" y1="120" x2="250" y2="150" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+      <line x1="210" y1="250" x2="280" y2="190" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+      <line x1="250" y1="150" x2="280" y2="190" stroke="rgba(255,255,255,0.22)" stroke-width="1.5"/>
+      <circle cx="40" cy="280" r="4" fill="rgba(255,255,255,0.6)"/>
+      <circle cx="110" cy="210" r="5" fill="rgba(255,255,255,0.85)"/>
+      <circle cx="210" cy="250" r="4.5" fill="rgba(255,255,255,0.7)"/>
+      <circle cx="150" cy="120" r="6" fill="#ffffff"/>
+      <circle cx="250" cy="150" r="4.5" fill="rgba(255,255,255,0.6)"/>
+      <circle cx="280" cy="190" r="5" fill="rgba(255,255,255,0.75)"/>
+    </svg>
   </div>
 
   <!-- Right Form Panel -->
   <div class="form-panel">
     <div class="login-card">
-      <div class="form-header">
-        <h2>System Login</h2>
-        <p>Welcome back! Enter your ID or Email to continue.</p>
+      <div class="form-header" *ngIf="!requiresPasswordReset() && !isForgotPasswordMode() && !requiresMfa()">
+        <h2>Sign in</h2>
+        <p>Enter your credentials to access your account.</p>
       </div>
 
       <div class="error-banner" *ngIf="errorMessage()">
         <i class="fa-solid fa-circle-exclamation"></i>
-        {{ errorMessage() }}
+        <span>{{ errorMessage() }}</span>
       </div>
 
       <!-- Regular Login Form -->
       <form *ngIf="!requiresPasswordReset() && !isForgotPasswordMode() && !requiresMfa()" (ngSubmit)="onSubmit()" #loginForm="ngForm">
-        <!-- Company Code Field -->
+        <!-- Identifier Field -->
         <div class="form-group">
-          <label for="companyCode">Company Code</label>
+          <label for="identifier">Email</label>
           <div class="input-wrapper">
-            <i class="fa-solid fa-building"></i>
-            <input 
-              id="companyCode"
-              type="text" 
-              [(ngModel)]="credentials.companyCode" 
-              name="companyCode" 
-              required
-              placeholder="e.g. softrateglobal.com">
-          </div>
-        </div>
-
-        <!-- Unified Login Field -->
-        <div class="form-group">
-          <label for="identifier">Email Address / ID</label>
-          <div class="input-wrapper">
-            <i class="fa-solid fa-envelope"></i>
             <input 
               id="identifier"
               type="text" 
               [(ngModel)]="credentials.identifier" 
               name="identifier" 
               required 
-              placeholder="your@email.com or ID">
+              placeholder="you@company.com or ID">
           </div>
         </div>
 
@@ -65,7 +64,6 @@
         <div class="form-group">
           <label for="password">Password</label>
           <div class="input-wrapper">
-            <i class="fa-solid fa-lock"></i>
             <input 
               id="password"
               [type]="showPassword() ? 'text' : 'password'" 
@@ -73,37 +71,43 @@
               name="password" 
               required 
               placeholder="••••••••">
-            <button type="button" class="password-toggle" (click)="showPassword.set(!showPassword())">
-              <hugeicons-icon [icon]="showPassword() ? ViewIcon : ViewOffIcon" size="20" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+            <button type="button" class="password-toggle-text" (click)="showPassword.set(!showPassword())">
+              {{ showPassword() ? 'Hide' : 'Show' }}
             </button>
-          </div>
-          <div style="text-align: right; margin-top: 5px;">
-             <a href="#" (click)="$event.preventDefault(); toggleForgotPasswordMode()" style="font-size: 0.9rem; color: #3b82f6; text-decoration: none;">Forgot Password?</a>
           </div>
         </div>
 
+        <!-- Remember Me & Forgot Password Row -->
+        <div class="form-options-row">
+          <label class="remember-me-label">
+            <input type="checkbox" [(ngModel)]="rememberMe" name="rememberMe">
+            <span>Remember me</span>
+          </label>
+          <a href="#" (click)="$event.preventDefault(); toggleForgotPasswordMode()" class="forgot-link">Forgot password?</a>
+        </div>
+
         <button type="submit" class="submit-btn" [disabled]="isLoading() || !loginForm.valid">
-          <span *ngIf="!isLoading()">Sign In</span>
+          <span *ngIf="!isLoading()">Sign in</span>
           <div class="spinner" *ngIf="isLoading()"></div>
         </button>
 
         <div class="form-footer">
-          <a routerLink="/register">Register Company</a>
-          <a routerLink="/user-register">Register User</a>
+          <p class="footer-copy">
+            Want to work with us? <a routerLink="/user-register">Apply Now</a>
+          </p>
         </div>
       </form>
 
       <!-- MFA Verification Form -->
       <form *ngIf="requiresMfa()" (ngSubmit)="onMfaSubmit()" #mfaForm="ngForm">
-        <div class="form-header" style="margin-top: -10px; margin-bottom: 20px;">
-          <h3 style="font-size: 1.2rem; color: #333; margin-bottom: 8px;">Two-Factor Authentication</h3>
-          <p style="color: #666; font-size: 0.9rem;">Please enter the 6-digit code from your Authenticator app.</p>
+        <div class="form-header">
+          <h2>Two-Factor Authentication</h2>
+          <p>Please enter the 6-digit code from your Authenticator app.</p>
         </div>
 
         <div class="form-group">
           <label for="mfaCode">Authenticator Code</label>
           <div class="input-wrapper">
-            <i class="fa-solid fa-shield-halved"></i>
             <input 
               id="mfaCode"
               type="text" 
@@ -112,7 +116,7 @@
               required 
               maxlength="6"
               placeholder="000000"
-              style="letter-spacing: 4px; font-weight: bold; text-align: center; font-size: 1.2rem;">
+              style="letter-spacing: 6px; font-weight: bold; text-align: center; font-size: 1.25rem;">
           </div>
         </div>
 
@@ -121,103 +125,90 @@
           <div class="spinner" *ngIf="isLoading()"></div>
         </button>
 
-        <div class="form-footer" style="justify-content: center; margin-top: 20px;">
-          <a href="#" (click)="$event.preventDefault(); requiresMfa.set(false); isLoading.set(false);">Cancel</a>
+        <div class="form-footer">
+          <a href="#" (click)="$event.preventDefault(); requiresMfa.set(false); isLoading.set(false);" class="back-link">Cancel</a>
         </div>
       </form>
 
       <!-- Forgot Password Form -->
       <form *ngIf="isForgotPasswordMode() && !requiresPasswordReset()" (ngSubmit)="onForgotPasswordSubmit()" #forgotForm="ngForm">
-        <div class="form-header" style="margin-top: -10px; margin-bottom: 20px;">
-          <h3 style="font-size: 1.2rem; color: #333; margin-bottom: 8px;">Reset Password</h3>
-          <p style="color: #666; font-size: 0.9rem;">Enter your company code and email address to receive a reset link.</p>
+        <div class="form-header">
+          <h2>Reset password</h2>
+          <p>Enter your email address to receive password reset instructions.</p>
         </div>
 
-        <div class="success-banner" *ngIf="forgotPasswordSuccess()" style="background-color: #ecfdf5; border-left: 4px solid #10b981; padding: 12px 16px; margin-bottom: 24px; border-radius: 4px;">
-          <p style="margin: 0; color: #047857; font-size: 13px; display: flex; align-items: flex-start; gap: 8px;">
-            <i class="fa-solid fa-circle-check" style="margin-top: 2px;"></i>
-            <span>Reset link sent successfully! Please check your inbox.</span>
-          </p>
+        <div class="success-banner" *ngIf="forgotPasswordSuccess()">
+          <i class="fa-solid fa-circle-check"></i>
+          <span>Reset instructions sent successfully! Please check your inbox.</span>
         </div>
 
         <ng-container *ngIf="!forgotPasswordSuccess()">
           <div class="form-group">
-            <label for="forgotCompanyCode">Company Code</label>
+            <label for="forgotEmail">Email</label>
             <div class="input-wrapper">
-              <i class="fa-solid fa-building"></i>
-              <input 
-                id="forgotCompanyCode"
-                type="text" 
-                [(ngModel)]="forgotPasswordData.companyCode" 
-                name="forgotCompanyCode" 
-                placeholder="e.g. softrateglobal.com">
-            </div>
-          </div>
-
-          <div class="form-group">
-            <label for="forgotEmail">Email Address</label>
-            <div class="input-wrapper">
-              <i class="fa-solid fa-envelope"></i>
               <input 
                 id="forgotEmail"
                 type="email" 
                 [(ngModel)]="forgotPasswordData.email" 
                 name="forgotEmail" 
                 required 
-                placeholder="your@email.com">
+                placeholder="you@company.com">
             </div>
           </div>
 
           <button type="submit" class="submit-btn" [disabled]="isLoading() || !forgotForm.valid">
-            <span *ngIf="!isLoading()">Send Reset Link</span>
+            <span *ngIf="!isLoading()">Send Reset Instructions</span>
             <div class="spinner" *ngIf="isLoading()"></div>
           </button>
         </ng-container>
 
-        <div class="form-footer" style="justify-content: center; margin-top: 20px;">
-          <a href="#" (click)="$event.preventDefault(); toggleForgotPasswordMode()">Back to Login</a>
+        <div class="form-footer">
+          <a href="#" (click)="$event.preventDefault(); toggleForgotPasswordMode()" class="back-link">
+            ← Back to Sign in
+          </a>
         </div>
       </form>
 
       <!-- Force Password Reset Form -->
       <form *ngIf="requiresPasswordReset()" (ngSubmit)="onResetSubmit()" #resetForm="ngForm">
-        <div style="background-color: #f0f9ff; border-left: 4px solid #0089d1; padding: 12px 16px; margin-bottom: 24px; border-radius: 4px;">
-          <p style="margin: 0; color: #0369a1; font-size: 13px; display: flex; align-items: flex-start; gap: 8px;">
-            <i class="fa-solid fa-circle-info" style="margin-top: 2px;"></i>
-            <span><strong>Security Requirement:</strong> Please change your default password before accessing your account. It must be at least 8 characters long, contain 1 uppercase letter, and 1 symbol.</span>
-          </p>
+        <div class="form-header">
+          <h2>Change Password</h2>
+          <p>Please update your default password to secure your account.</p>
+        </div>
+
+        <div class="info-banner">
+          <i class="fa-solid fa-circle-info"></i>
+          <span>Must be at least 8 characters, with 1 uppercase letter and 1 symbol.</span>
         </div>
 
         <div class="form-group">
           <label for="newPassword">New Password</label>
           <div class="input-wrapper">
-            <i class="fa-solid fa-lock"></i>
             <input 
               id="newPassword"
               type="password" 
               [(ngModel)]="newPassword" 
               name="newPassword" 
               required 
-              placeholder="New Password">
+              placeholder="••••••••">
           </div>
         </div>
 
         <div class="form-group">
           <label for="confirmPassword">Confirm New Password</label>
           <div class="input-wrapper">
-            <i class="fa-solid fa-lock"></i>
             <input 
               id="confirmPassword"
               type="password" 
               [(ngModel)]="confirmPassword" 
               name="confirmPassword" 
               required 
-              placeholder="Confirm Password">
+              placeholder="••••••••">
           </div>
         </div>
 
         <button type="submit" class="submit-btn" [disabled]="isLoading() || !resetForm.valid">
-          <span *ngIf="!isLoading()">Update Password & Login</span>
+          <span *ngIf="!isLoading()">Update Password & Sign in</span>
           <div class="spinner" *ngIf="isLoading()"></div>
         </button>
       </form>

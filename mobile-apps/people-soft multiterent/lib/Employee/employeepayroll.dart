@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:hrmappfrontend/auth_client.dart' as http;
 import 'package:hrmappfrontend/port.dart';
+import 'package:hrmappfrontend/utils/pdf_downloader.dart';
 
 class EmployeePayrollPage extends StatefulWidget {
   const EmployeePayrollPage({super.key});
@@ -30,6 +31,7 @@ class _EmployeePayrollPageState extends State<EmployeePayrollPage>
   String? _error;
 
   // Profile
+  String _empId = '';
   DateTime? _onboardingDate;
   String _employeeName = '';
   String _designation  = '';
@@ -93,6 +95,7 @@ class _EmployeePayrollPageState extends State<EmployeePayrollPage>
       // ── 1. Parse employee profile ─────────────────────────────────────────────
       final profileBody = jsonDecode(results[0].body);
       final profile = profileBody['employee'] ?? profileBody['data'] ?? profileBody;
+      _empId = employeeId;
       _employeeName = ('${profile['firstName'] ?? ''} ${profile['lastName'] ?? ''}').trim();
       if (_employeeName.isEmpty) _employeeName = (profile['fullName'] ?? '').toString().trim();
       _designation  = profile['designation'] ?? profile['jobTitle'] ?? '';
@@ -630,21 +633,21 @@ class _EmployeePayrollPageState extends State<EmployeePayrollPage>
   List<Widget> _buildDynamicPaySlips() {
     final List<Widget> slips = [];
     final now = DateTime.now();
-    DateTime currentCheck = DateTime(now.year, now.month - 1, 1);
+    DateTime currentCheck = DateTime(now.year, now.month, 1);
     
     int maxSlips = _onboardingDate == null ? 3 : 12;
 
     for (int i = 0; i < maxSlips; i++) {
       if (_onboardingDate != null) {
-        if (currentCheck.year < _onboardingDate!.year || 
-            (currentCheck.year == _onboardingDate!.year && currentCheck.month < _onboardingDate!.month)) {
+        if ((currentCheck.year < _onboardingDate!.year || 
+            (currentCheck.year == _onboardingDate!.year && currentCheck.month < _onboardingDate!.month)) && slips.isNotEmpty) {
           break;
         }
       }
       
       final monthStr = DateFormat('MMMM yyyy').format(currentCheck);
-      final issueDate = DateTime(currentCheck.year, currentCheck.month + 1, 1);
-      final issueDateStr = DateFormat('MMM dd, yyyy').format(issueDate);
+      final lastDayOfMonth = DateTime(currentCheck.year, currentCheck.month + 1, 0);
+      final issueDateStr = DateFormat('MMM dd, yyyy').format(lastDayOfMonth);
       
       slips.add(_buildPaySlipItem(monthStr, issueDateStr));
       currentCheck = DateTime(currentCheck.year, currentCheck.month - 1, 1);
@@ -687,10 +690,28 @@ class _EmployeePayrollPageState extends State<EmployeePayrollPage>
             ),
           ),
           IconButton(
-            onPressed: () {
+            onPressed: () async {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Downloading pay slip…')),
+                SnackBar(content: Text('Downloading payslip for $month...')),
               );
+              final base = getBaseUrl();
+              final encodedMonth = Uri.encodeComponent(month);
+              final downloadUrl = '$base/api/payroll/payslip-pdf/$_empId?month=$encodedMonth';
+              final safeMonth = month.replaceAll(' ', '_');
+              final fileName = 'Payslip_${_empId}_$safeMonth.pdf';
+
+              final success = await PdfDownloader.downloadPdf(downloadUrl, fileName);
+              if (mounted) {
+                if (success) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('Payslip for $month downloaded successfully!')),
+                  );
+                } else {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Failed to download payslip. Please try again.')),
+                  );
+                }
+              }
             },
             icon: const Icon(Icons.file_download_outlined, color: accentColor),
           ),

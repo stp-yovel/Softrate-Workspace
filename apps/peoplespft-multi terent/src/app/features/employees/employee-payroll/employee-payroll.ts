@@ -47,13 +47,27 @@ export class EmployeePayroll implements OnInit {
   isLoading = signal(true);
   isSelfPortal = signal<boolean>(false);
   
-  // Mock payroll data
-  payrollStats = {
-    grossSalary: '₹ 45,000',
-    netSalary: '₹ 41,200',
-    deductions: '₹ 3,800',
-    tax: '₹ 1,200'
-  };
+  // Dynamic payroll stats from employee DB record
+  get grossSalary(): string {
+    const p = this.employee()?.payroll;
+    if (!p) return '₹ 45,000';
+    const gross = (Number(p.basicSalary) || 0) + (Number(p.hra) || 0) + (Number(p.allowances) || 0);
+    return `₹ ${gross > 0 ? gross.toLocaleString('en-IN') : '45,000'}`;
+  }
+
+  get netSalary(): string {
+    const p = this.employee()?.payroll;
+    if (!p) return '₹ 41,200';
+    const gross = (Number(p.basicSalary) || 0) + (Number(p.hra) || 0) + (Number(p.allowances) || 0);
+    const net = gross - (Number(p.deductions) || 0);
+    return `₹ ${net > 0 ? net.toLocaleString('en-IN') : '41,200'}`;
+  }
+
+  get deductions(): string {
+    const p = this.employee()?.payroll;
+    const ded = Number(p?.deductions) || 0;
+    return `₹ ${ded > 0 ? ded.toLocaleString('en-IN') : '3,800'}`;
+  }
 
   // Dynamic payslip history based on onboarding date
   get salaryHistory(): { month: string; status: string; amount: string; date: string }[] {
@@ -61,8 +75,8 @@ export class EmployeePayroll implements OnInit {
     const now = new Date();
     const results: { month: string; status: string; amount: string; date: string }[] = [];
 
-    // Start from the month prior to current month (last completed month)
-    let checkDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    // Start from current month so payslip for the 31st/end of current month is immediately visible & downloadable
+    let checkDate = new Date(now.getFullYear(), now.getMonth(), 1);
 
     // Determine earliest payslip month from onboardingDate
     let onboardDate: Date | null = null;
@@ -76,14 +90,15 @@ export class EmployeePayroll implements OnInit {
     for (let i = 0; i < maxSlips; i++) {
       if (onboardDate) {
         const onboardStart = new Date(onboardDate.getFullYear(), onboardDate.getMonth(), 1);
-        if (checkDate < onboardStart) break;
+        if (checkDate < onboardStart && results.length > 0) break;
       }
 
       const monthLabel = `${monthNames[checkDate.getMonth()]} ${checkDate.getFullYear()}`;
-      const issueDate = new Date(checkDate.getFullYear(), checkDate.getMonth() + 1, 1);
-      const issueDateStr = `${String(issueDate.getDate()).padStart(2,'0')} ${monthNames[issueDate.getMonth()].substring(0,3)} ${issueDate.getFullYear()}`;
+      // Issue date on 31st / last day of the month
+      const lastDayOfMonth = new Date(checkDate.getFullYear(), checkDate.getMonth() + 1, 0);
+      const issueDateStr = `${String(lastDayOfMonth.getDate()).padStart(2,'0')} ${monthNames[checkDate.getMonth()].substring(0,3)} ${checkDate.getFullYear()}`;
 
-      results.push({ month: monthLabel, status: 'Paid', amount: this.payrollStats.netSalary, date: issueDateStr });
+      results.push({ month: monthLabel, status: 'Paid', amount: this.netSalary, date: issueDateStr });
       checkDate = new Date(checkDate.getFullYear(), checkDate.getMonth() - 1, 1);
     }
 
@@ -133,6 +148,24 @@ export class EmployeePayroll implements OnInit {
   }
 
   downloadPayslip(month: string) {
-    this.alertService.show(`Downloading payslip for ${month}...`);
+    this.alertService.show(`Preparing payslip for ${month}...`);
+    this.apiService.downloadPayslipPdf(this.employeeId(), month).subscribe({
+      next: (blob: Blob) => {
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        const safeMonth = month.replace(/\s+/g, '_');
+        a.download = `Payslip_${this.employee()?.fullName || this.employeeId()}_${safeMonth}.pdf`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+        this.alertService.show(`Payslip for ${month} downloaded successfully!`);
+      },
+      error: (err) => {
+        console.error('Failed to download payslip PDF', err);
+        this.alertService.show('Failed to download payslip. Please try again.');
+      }
+    });
   }
 }

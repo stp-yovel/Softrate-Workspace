@@ -18,6 +18,8 @@ export class WalkinDrivesComponent implements OnInit {
   historyDrives: any[] = [];
   isModalOpen = false;
 
+  driveType: 'walkin' | 'seasonal' = 'walkin';
+  title = '';
   startDate = '';
   startTime = '';
   endDate = '';
@@ -97,36 +99,57 @@ export class WalkinDrivesComponent implements OnInit {
   }
 
   submitDrive(): void {
-    if (!this.startDate || !this.startTime || !this.endDate || !this.endTime || !this.whatsappGroupLink || !this.selectedFile) {
-      this.alertService.show('Please fill all fields and select a PDF', 'error');
+    if (!this.startDate || !this.startTime || !this.endDate || !this.endTime) {
+      this.alertService.show('Please specify start and end dates and times', 'error');
       return;
+    }
+
+    if (this.driveType === 'walkin') {
+      if (!this.whatsappGroupLink || !this.selectedFile) {
+        this.alertService.show('Please fill WhatsApp link and select JD PDF for walk-in drive', 'error');
+        return;
+      }
+    } else if (this.driveType === 'seasonal') {
+      if (!this.title.trim()) {
+        this.alertService.show('Please provide a title for the seasonal internship (e.g. Winter Internship 2026)', 'error');
+        return;
+      }
     }
 
     this.isSubmitting = true;
     const formData = new FormData();
+    formData.append('driveType', this.driveType);
+    formData.append('title', this.title.trim());
     formData.append('startDate', this.startDate);
     formData.append('startTime', this.startTime);
     formData.append('endDate', this.endDate);
     formData.append('endTime', this.endTime);
-    formData.append('whatsappGroupLink', this.whatsappGroupLink);
-    formData.append('jdPdf', this.selectedFile);
+    if (this.whatsappGroupLink) {
+      formData.append('whatsappGroupLink', this.whatsappGroupLink);
+    }
+    if (this.selectedFile) {
+      formData.append('jdPdf', this.selectedFile);
+    }
 
     this.apiService.createWalkinDrive(formData).subscribe({
       next: (res) => {
-        this.alertService.show('Walkin Drive created successfully', 'success');
+        const driveLabel = this.driveType === 'seasonal' ? 'Seasonal Internship' : 'Walkin Drive';
+        this.alertService.show(`${driveLabel} created successfully`, 'success');
         this.isSubmitting = false;
         this.closeModal();
         this.fetchDrives();
       },
       error: (err) => {
         console.error('Error creating drive', err);
-        this.alertService.show('Failed to create walkin drive', 'error');
+        this.alertService.show(err?.error?.message || 'Failed to create drive', 'error');
         this.isSubmitting = false;
       }
     });
   }
 
   resetForm(): void {
+    this.driveType = 'walkin';
+    this.title = '';
     this.startDate = '';
     this.startTime = '';
     this.endDate = '';

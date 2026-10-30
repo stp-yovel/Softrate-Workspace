@@ -13,6 +13,8 @@ import 'package:hrmappfrontend/utils/device_info_helper.dart';
 import 'package:hrmappfrontend/device_mismatch_page.dart';
 import 'package:hrmappfrontend/force_password_reset_page.dart';
 import 'package:hrmappfrontend/Employee/employee_complete_details.dart';
+import 'package:hrmappfrontend/application_flow_page.dart';
+import 'package:hrmappfrontend/intern/form_one.dart';
 
 class UnifiedLoginPage extends StatefulWidget {
   const UnifiedLoginPage({super.key});
@@ -23,7 +25,7 @@ class UnifiedLoginPage extends StatefulWidget {
 
 class _UnifiedLoginPageState extends State<UnifiedLoginPage>
     with SingleTickerProviderStateMixin {
-  final TextEditingController _companyCtrl = TextEditingController();
+  final TextEditingController _companyCtrl = TextEditingController(text: 'SOFTRATE');
   final TextEditingController _idCtrl = TextEditingController();
   final TextEditingController _passCtrl = TextEditingController();
   final _formKey = GlobalKey<FormState>();
@@ -47,6 +49,8 @@ class _UnifiedLoginPageState extends State<UnifiedLoginPage>
       setState(() {
         _companyCtrl.text = cachedCode;
       });
+    } else {
+      _companyCtrl.text = 'SOFTRATE';
     }
   }
 
@@ -107,12 +111,15 @@ class _UnifiedLoginPageState extends State<UnifiedLoginPage>
       );
 
       final String deviceId = await DeviceInfoHelper.getDeviceId();
+      final String companyCode = _companyCtrl.text.trim().isNotEmpty
+          ? _companyCtrl.text.trim().toUpperCase()
+          : 'SOFTRATE';
 
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'companyCode': _companyCtrl.text.trim(),
+          'companyCode': companyCode,
           'identifier': _idCtrl.text.trim(),
           'password': _passCtrl.text.trim(),
           'deviceId': deviceId,
@@ -137,7 +144,7 @@ class _UnifiedLoginPageState extends State<UnifiedLoginPage>
               builder: (_) => DeviceMismatchPage(
                 identifier: _idCtrl.text.trim(),
                 password: _passCtrl.text.trim(),
-                companyCode: _companyCtrl.text.trim(),
+                companyCode: companyCode,
                 newDeviceId: deviceId,
                 requestStatus: data['requestStatus'] ?? 'none',
               ),
@@ -164,6 +171,29 @@ class _UnifiedLoginPageState extends State<UnifiedLoginPage>
         return;
       }
 
+      if (data['requiresOnboarding'] == true && data['onboardingType'] == 'campus') {
+        setState(() => _loading = false);
+        final campusStudent = data['campusStudent'] as Map<String, dynamic>? ?? {};
+        final compCode = (data['companyCode'] ?? companyCode) as String;
+        final compName = (data['companyName'] ?? '') as String;
+        final candidateRoles = List<String>.from(campusStudent['appliedRoles'] ?? []);
+
+        if (!mounted) return;
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => FormOne(
+              companyCode: compCode,
+              companyName: compName,
+              campusStudent: campusStudent,
+              role: candidateRoles.length == 1 ? candidateRoles.first : null,
+            ),
+          ),
+        );
+        return;
+      }
+
       _processSuccessfulLogin(data);
     } catch (e) {
       setState(() {
@@ -185,7 +215,12 @@ class _UnifiedLoginPageState extends State<UnifiedLoginPage>
       await prefs.setString('auth_token', token);
     }
     await prefs.setString('user_role', role);
-    await prefs.setString('cached_company_code', _companyCtrl.text.trim());
+    await prefs.setString(
+      'cached_company_code',
+      _companyCtrl.text.trim().isNotEmpty
+          ? _companyCtrl.text.trim().toUpperCase()
+          : 'SOFTRATE',
+    );
 
     TextInput.finishAutofillContext();
     setState(() => _loading = false);
@@ -507,7 +542,6 @@ class _UnifiedLoginPageState extends State<UnifiedLoginPage>
   // ── Forgot Password ────────────────────────────────────────────────────────
   Future<void> _forgotPassword() async {
     final emailCtrl = TextEditingController();
-    final forgotCompanyCtrl = TextEditingController(text: _companyCtrl.text);
 
     await showDialog(
       context: context,
@@ -530,18 +564,10 @@ class _UnifiedLoginPageState extends State<UnifiedLoginPage>
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Text(
-                  'Enter your company code and email address.',
+                  'Enter your email address to receive password reset instructions.',
                   style: TextStyle(fontSize: 13, color: Colors.black54),
                 ),
                 const SizedBox(height: 16),
-                TextField(
-                  controller: forgotCompanyCtrl,
-                  decoration: _inputDecoration(
-                    hint: 'Company Code',
-                    icon: HugeIcons.strokeRoundedBuilding03,
-                  ),
-                ),
-                const SizedBox(height: 12),
                 TextField(
                   controller: emailCtrl,
                   keyboardType: TextInputType.emailAddress,
@@ -573,12 +599,15 @@ class _UnifiedLoginPageState extends State<UnifiedLoginPage>
                     : () async {
                         setS(() => sending = true);
                         try {
+                          final String companyCode = _companyCtrl.text.trim().isNotEmpty
+                              ? _companyCtrl.text.trim().toUpperCase()
+                              : 'SOFTRATE';
                           final r = await http.post(
                             Uri.parse('$_baseUrl/api/auth/forgot-password'),
                             headers: {'Content-Type': 'application/json'},
                             body: jsonEncode({
                               'email': emailCtrl.text.trim(),
-                              'companyCode': forgotCompanyCtrl.text.trim(),
+                              'companyCode': companyCode,
                             }),
                           );
                           if (!mounted) return;
@@ -754,33 +783,6 @@ class _UnifiedLoginPageState extends State<UnifiedLoginPage>
                                   ),
                                   const SizedBox(height: 32),
 
-                                  // Company Code field
-                                  const Text(
-                                    'Company Code *',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 6),
-                                  TextFormField(
-                                    controller: _companyCtrl,
-                                    keyboardType: TextInputType.text,
-                                    decoration: _inputDecoration(
-                                      hint: 'Enter your company code',
-                                      icon: HugeIcons.strokeRoundedBuilding03,
-                                    ),
-                                    validator: (value) {
-                                      if (value == null ||
-                                          value.trim().isEmpty) {
-                                        return 'Company code is required';
-                                      }
-                                      return null;
-                                    },
-                                  ),
-
-                                  const SizedBox(height: 18),
-
                                   // Email field
                                   const Text(
                                     'Email Address',
@@ -934,6 +936,46 @@ class _UnifiedLoginPageState extends State<UnifiedLoginPage>
                                                 color: Colors.white,
                                               ),
                                             ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+
+                                  // Registration Link
+                                  Center(
+                                    child: TextButton(
+                                      onPressed: () {
+                                        Navigator.push(
+                                          context,
+                                          MaterialPageRoute(
+                                            builder: (_) => ApplicationFlowPage(
+                                              initialCompanyCode: _companyCtrl.text.trim().isNotEmpty
+                                                  ? _companyCtrl.text.trim().toUpperCase()
+                                                  : 'SOFTRATE',
+                                            ),
+                                          ),
+                                        );
+                                      },
+                                      style: TextButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      ),
+                                      child: RichText(
+                                        text: const TextSpan(
+                                          text: 'Want to work with us? ',
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.black87,
+                                          ),
+                                          children: [
+                                            TextSpan(
+                                              text: 'Apply Now',
+                                              style: TextStyle(
+                                                color: Color(0xFF00657F),
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 16),

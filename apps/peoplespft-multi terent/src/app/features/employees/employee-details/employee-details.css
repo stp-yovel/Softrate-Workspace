@@ -2,7 +2,8 @@
   display: flex;
   gap: 1rem;
   padding: 1.5rem;
-  padding-right: 106px; /* 90px sidebar + 16px gap */
+  padding-right: 106px;
+  /* 90px sidebar + 16px gap */
   align-items: flex-start;
   background: var(--hc-bg);
   min-height: 100vh;
@@ -130,10 +131,25 @@
   margin-bottom: 1rem;
 }
 
-.status-pill.status-green { background: #DCFCE7; color: #166534; }
-.status-pill.status-orange { background: #FFEDD5; color: #9A3412; }
-.status-pill.status-red { background: #FEE2E2; color: #991B1B; }
-.status-pill.status-gray { background: #F1F5F9; color: #475569; }
+.status-pill.status-green {
+  background: #DCFCE7;
+  color: #166534;
+}
+
+.status-pill.status-orange {
+  background: #FFEDD5;
+  color: #9A3412;
+}
+
+.status-pill.status-red {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.status-pill.status-gray {
+  background: #F1F5F9;
+  color: #475569;
+}
 
 .quick-stats {
   margin-top: 1.25rem;
@@ -236,9 +252,17 @@
   line-height: 1.4;
 }
 
-.w-100 { width: 100%; }
-.mt-2 { margin-top: 0.5rem; }
-.mb-2 { margin-bottom: 0.5rem; }
+.w-100 {
+  width: 100%;
+}
+
+.mt-2 {
+  margin-top: 0.5rem;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
 
 .btn-primary-outline {
   background: transparent;
@@ -282,7 +306,9 @@
   color: white;
 }
 
-.btn-primary-outline:disabled, .btn-secondary-outline:disabled, .btn-danger-outline:disabled {
+.btn-primary-outline:disabled,
+.btn-secondary-outline:disabled,
+.btn-danger-outline:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
@@ -396,8 +422,445 @@
   .main-content-layout {
     padding-right: 1.5rem;
   }
+
   .profile-layout {
     grid-template-columns: 1fr;
     padding: 1rem;
   }
+}
+
+/* --------------------------------------------------------------------------
+   LMS Course Mapping in Profile
+   -------------------------------------------------------------------------- */
+.lms-profile-card {
+  margin-top: 1rem;
+}
+
+.btn-assign-sm {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background-color: #2563eb;
+  color: #ffffff;
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-assign-sm:hover {
+  background-color: #1d4ed8;
+}
+
+.lms-courses-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.lms-course-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  gap: 1.5rem;
+}
+
+.course-main {
+  flex: 1;
+  min-width: 0;
+}
+
+.course-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.35rem;
+  flex-wrap: wrap;
+}
+
+.course-name {
+  font-weight: 600;
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+
+.course-code-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 0.15rem 0.45rem;
+  border-radius: 4px;
+}
+
+.course-category-pill {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #2563eb;
+  background: #eff6ff;
+  padding: 0.15rem 0.5rem;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.course-desc {
+  font-size: 0.82rem;
+  color: #64748b;
+  margin-bottom: 0.6rem;
+}
+
+.course-progress-bar {
+  height: 6px;
+  background: #e2e8f0;
+  border-radius: 3px;
+  overflow: hidden;
+  margin-bottom: 0.35rem;
+}
+
+.course-progress-bar .progress-fill {
+  height: 100%;
+  background: #2563eb;
+  border-radius: 3px;
+  transition: width 0.3s ease;
+}
+
+.progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.75rem;
+  color: #64748b;
+}
+
+.progress-pct {
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.course-status-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.assigned-date {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.empty-lms-state {
+  text-align: center;
+  padding: 2rem 1rem;
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+/* Custom Modal */
+.modal-backdrop-custom {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.5rem;
+}
+
+.modal-dialog-custom {
+  background: #ffffff;
+  border-radius: 12px;
+  width: 100%;
+  max-width: 520px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  animation: modal-pop 0.15s ease-out;
+}
+
+@keyframes modal-pop {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.modal-header-custom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.modal-header-custom h3 {
+  font-size: 1.15rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0;
+}
+
+.btn-close-custom {
+  background: transparent;
+  border: none;
+  font-size: 1.5rem;
+  line-height: 1;
+  color: #94a3b8;
+  cursor: pointer;
+}
+
+.btn-close-custom:hover {
+  color: #0f172a;
+}
+
+.modal-body-custom {
+  padding: 1.5rem;
+}
+
+.modal-hint {
+  font-size: 0.88rem;
+  color: #64748b;
+  margin-bottom: 1.25rem;
+  line-height: 1.45;
+}
+
+.form-group-custom label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #334155;
+  margin-bottom: 0.5rem;
+}
+
+.custom-select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.9rem;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #0f172a;
+  outline: none;
+}
+
+.custom-select:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.1);
+}
+
+.modal-footer-custom {
+  padding: 1rem 1.5rem;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.btn-secondary-custom {
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #475569;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-primary-custom {
+  padding: 0.5rem 1.2rem;
+  border-radius: 6px;
+  border: none;
+  background: #0f172a;
+  color: #ffffff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.15s ease;
+}
+
+.btn-primary-custom:hover:not(:disabled) {
+  background: #1e293b;
+}
+
+.btn-primary-custom:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* --------------------------------------------------------------------------
+   Application & Form One Details Card
+   -------------------------------------------------------------------------- */
+.form-one-card {
+  border-left: none;
+}
+
+.status-blue {
+  background: #eff6ff;
+  color: #1d4ed8;
+  border: 1px solid #bfdbfe;
+  font-weight: 600;
+  padding: 0.2rem 0.55rem;
+  border-radius: 999px;
+}
+
+.form-one-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  gap: 1rem;
+  padding: 1.25rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.f1-stat-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.f1-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.f1-val {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #0f172a;
+}
+
+.highlight-ctc {
+  font-weight: 700;
+  color: #047857;
+}
+
+.linkedin-view-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #0077b5;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-decoration: none;
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  padding: 0.25rem 0.65rem;
+  border-radius: 6px;
+  width: fit-content;
+  transition: all 0.15s ease;
+}
+
+.linkedin-view-btn:hover {
+  background: #f0f7ff;
+  border-color: #0077b5;
+  color: #005582;
+  text-decoration: none;
+}
+
+/* Project Links Box */
+.f1-projects-container,
+.f1-assessment-container {
+  margin-top: 1.25rem;
+  padding: 1rem 1.25rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.f1-sub-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #0f172a;
+  margin-bottom: 0.75rem;
+}
+
+.f1-count-pill {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+}
+
+.f1-links-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.f1-project-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0.4rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  color: #2563eb;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: all 0.15s ease;
+  word-break: break-all;
+}
+
+.f1-project-chip:hover {
+  background: #eff6ff;
+  border-color: #2563eb;
+  color: #1d4ed8;
+  text-decoration: none;
+}
+
+/* Assessment QA */
+.f1-qa-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.f1-qa-item {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+}
+
+.f1-q {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #64748b;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 0.25rem;
+}
+
+.f1-a {
+  font-size: 0.875rem;
+  color: #0f172a;
+  white-space: pre-wrap;
+  line-height: 1.5;
 }

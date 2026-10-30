@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/AuthController");
 const verifyTenant = require("../middleware/tenant.middleware");
+const loginPreflight = require("../middleware/loginPreflight.middleware");
 const multer = require("multer");
 const rateLimit = require("express-rate-limit");
 
@@ -39,8 +40,8 @@ const handleProfilePhotoUpload = (req, res, next) => {
   });
 };
 
-router.post("/login", loginLimiter, authController.login);
-router.post("/unified-login", loginLimiter, authController.login);
+router.post("/login", loginLimiter, loginPreflight, authController.login);
+router.post("/unified-login", loginLimiter, loginPreflight, authController.login);
 router.get("/me", verifyTenant, authController.getMe);
 router.patch("/me/profile-photo", verifyTenant, handleProfilePhotoUpload, authController.updateProfilePhoto);
 router.delete("/me/profile-photo", verifyTenant, authController.removeProfilePhoto);

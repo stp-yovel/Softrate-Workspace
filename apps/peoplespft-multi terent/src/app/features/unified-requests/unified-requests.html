@@ -568,5 +568,71 @@
       </div>
     </div>
 
+    <!-- Reject Application Modal for Candidate Onboarding Rejections -->
+    <div class="modal-backdrop" *ngIf="showRejectModal()" (click)="closeRejectModal()">
+      <div class="modal-dialog shortlist-modal" (click)="$event.stopPropagation()">
+        <div class="modal-header">
+          <div>
+            <h3>Reject Application</h3>
+            <p>Send a rejection notification email to {{ (rejectCandidate()?.requesterName || rejectCandidate()?.raw?.fullName) || 'the candidate' }}.</p>
+          </div>
+          <button type="button" class="btn-close-modal" (click)="closeRejectModal()">
+            <i class="fa-solid fa-xmark"></i>
+          </button>
+        </div>
+
+        <div class="modal-body">
+          <!-- Candidate Preview Tag -->
+          <div class="candidate-mini-card">
+            <div class="candidate-meta">
+              <span class="candidate-name">{{ rejectCandidate()?.requesterName || rejectCandidate()?.raw?.fullName }}</span>
+              <span class="candidate-role">{{ rejectCandidate()?.raw?.designation || rejectCandidate()?.raw?.role || rejectCandidate()?.raw?.domain || rejectCandidate()?.subType || 'Applicant' }}</span>
+            </div>
+            <span class="candidate-email">{{ rejectCandidate()?.raw?.email || rejectCandidate()?.raw?.phone || rejectCandidate()?.requesterId || '-' }}</span>
+          </div>
+
+          <!-- Optional Reason Input -->
+          <div class="form-group" style="margin-top: 1rem;">
+            <label style="font-size: 13px; font-weight: 600; color: #1e293b;">Rejection Feedback / Notes (Optional)</label>
+            <input 
+              type="text" 
+              [(ngModel)]="rejectForm.reason" 
+              (ngModelChange)="generateRejectEmailBody()" 
+              placeholder="e.g. Currently seeking candidates with stronger proficiency in specific domain."
+              class="modal-input"
+            >
+            <p style="font-size: 11px; color: #64748b; margin-top: 4px;">This note will be incorporated into the candidate's rejection email.</p>
+          </div>
+
+          <!-- Email Content Editor -->
+          <div class="email-editor-section">
+            <div class="editor-header">
+              <label>Rejection Email Content</label>
+              <button type="button" class="btn-regen" (click)="generateRejectEmailBody()" title="Reset to default template">
+                <i class="fa-solid fa-arrows-rotate"></i> Reset Template
+              </button>
+            </div>
+
+            <div class="form-group">
+              <input type="text" [(ngModel)]="rejectForm.emailSubject" placeholder="Email Subject" class="modal-input subject-input">
+            </div>
+
+            <div class="form-group">
+              <textarea [(ngModel)]="rejectForm.emailBody" rows="6" class="modal-textarea" placeholder="Email body content"></textarea>
+            </div>
+          </div>
+        </div>
+
+        <div class="modal-footer">
+          <button type="button" class="btn-cancel" (click)="closeRejectModal()" [disabled]="isSendingReject()">
+            Cancel
+          </button>
+          <button type="button" class="btn-danger" (click)="submitRejectModal()" [disabled]="isSendingReject()">
+            <span>{{ isSendingReject() ? 'Rejecting...' : 'Confirm & Send Rejection Email' }}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
   </div><!-- /unified-section -->
 </div>

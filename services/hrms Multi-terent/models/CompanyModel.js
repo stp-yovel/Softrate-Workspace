@@ -35,6 +35,7 @@ const CompanySchema = new mongoose.Schema({
       emailNotifications: { type: Boolean, default: true },
       emailLogoUrl: { type: String, default: null },
       emailSignatureUrl: { type: String, default: null },
+      companyAddress: { type: String, default: 'Softrate Tech Park, No: 60A, Velleeswaran Kovil Street, Mangadu, Chennai - 600122' },
       offboardingRejectionTemplate: { 
         type: String, 
         default: `<div style="font-family: sans-serif; line-height: 1.5; color: #333;">
@@ -86,10 +87,65 @@ const CompanySchema = new mongoose.Schema({
   <p style="margin: 0 0 0 0;">To proceed further, please log in to the PeopleSoft portal using the credentials shared separately.</p>
   {signature}
 </div>`
+      },
+      shortlistInterviewTemplate: {
+        type: String,
+        default: `<div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+  <p>Dear {formattedName},</p>
+  <p>Congratulations! We are pleased to inform you that your application for the <b>{role}</b> position has been shortlisted.</p>
+  <p>We would like to invite you for an interview / discussion meeting scheduled as follows:</p>
+  <ul>
+    <li><b>Date & Time:</b> {meetDate} at {meetTime}</li>
+    <li><b>Meeting Platform / Link:</b> <a href="{meetLink}" target="_blank" style="color: #007bb6;">{meetLink}</a></li>
+    <li><b>Notes / Instructions:</b> {meetNotes}</li>
+  </ul>
+  <p>Please make sure to join on time. If you have any questions or need to reschedule, feel free to reply directly to this email.</p>
+  <p>Best regards,</p>
+  {signature}
+</div>`
+      },
+      applicationRejectionTemplate: {
+        type: String,
+        default: `<div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+  <p>Dear {formattedName},</p>
+  <p>Thank you for taking the time to apply for the <b>{role}</b> position with us and for your interest in our company.</p>
+  <p>After careful consideration and review of your application, we regret to inform you that we will not be moving forward with your candidacy for this role at this time.</p>
+  <p>{reason}</p>
+  <p>We truly appreciate the effort you put into your application and wish you the very best in your job search and future professional endeavors.</p>
+  <p>Best regards,</p>
+  {signature}
+</div>`
       }
     },
+    roles: [{
+      name: { type: String, required: true },
+      isEmployee: { type: Boolean, default: true },
+      isIntern: { type: Boolean, default: false }
+    }],
     employeeRoles: [{ type: String }],
     internRoles: [{ type: String }],
+    careerPostings: [{
+      job_id: { type: String, required: true },
+      title: { type: String, required: true },
+      category: { type: String, default: 'engineering' },
+      categoryName: { type: String, default: 'Engineering' },
+      department: { type: String, default: '' },
+      location: { type: String, default: 'India' },
+      workType: { type: String, default: 'Full-Time' },
+      is_important: { type: Boolean, default: false },
+      shortSummary: { type: String, default: '' },
+      about: { type: String, default: '' },
+      responsibilities: [{ type: String }],
+      requirements: [{ type: String }],
+      note: { type: String, default: '' },
+      applyEmail: { type: String, default: 'careers@softrateglobal.com' },
+      tags: [{ type: String }],
+      roleType: { type: String, enum: ['Employee', 'Internship'], default: 'Employee' },
+      isListed: { type: Boolean, default: true },
+      assessment: { type: mongoose.Schema.Types.Mixed, default: null },
+      createdAt: { type: Date, default: Date.now },
+      updatedAt: { type: Date, default: Date.now }
+    }],
     hrPolicyUrl: { type: String, default: null },
     hrPolicyUpdatedAt: { type: Date, default: null },
     payrollSettings: {
@@ -156,7 +212,7 @@ const CompanySchema = new mongoose.Schema({
       ]
     }
   }
-}, { timestamps: true });
+}, { timestamps: true, strict: false });
 
 // Update timestamp on save
 CompanySchema.pre('save', async function() {

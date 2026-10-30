@@ -1,6 +1,7 @@
 const { getMasterConnection, getTenantConnection, waitForConnection } = require('../db');
 const { getModelsForConnection } = require('../utilities/modelLoader');
 const CompanyModelExport = require('../models/CompanyModel');
+const { resolveCompany } = require('../utilities/companyCache');
 const { sendEmail, LOGO_URL } = require("../utilities/sendEmail");
 const { getSignature } = require("../utilities/emailSignature");
 const crypto = require("crypto");
@@ -73,7 +74,12 @@ async function findCurrentUser(req, includePhoto = false) {
   let query = Model.findById(req.user.id);
   if (photoSelect) query = query.select(photoSelect);
   if (Model === User) {
-    query = query.populate('roleId companyId departmentId branchId');
+    query = query
+      .populate({ path: 'roleId', select: 'name permissions' })
+      .populate({ path: 'departmentId', select: 'name' })
+      .populate({ path: 'branchId', select: 'name location' });
+    // ❌ Do NOT populate companyId — it loads the full 2.38MB company doc on every /me request
+    // Use req.tenant for company context instead
   } else {
     query = query.populate({ path: 'assignedManager', select: 'fullName email phone contact' });
   }
@@ -87,7 +93,10 @@ async function findCurrentUser(req, includePhoto = false) {
       let fq = FallbackModel.findById(req.user.id);
       if (photoSelect) fq = fq.select(photoSelect);
       if (FallbackModel === User) {
-        fq = fq.populate('roleId companyId departmentId branchId');
+        fq = fq
+          .populate({ path: 'roleId', select: 'name permissions' })
+          .populate({ path: 'departmentId', select: 'name' })
+          .populate({ path: 'branchId', select: 'name location' });
       } else {
         fq = fq.populate({ path: 'assignedManager', select: 'fullName email phone contact' });
       }
@@ -106,6 +115,42 @@ async function findCurrentUser(req, includePhoto = false) {
   return { user, role: resolvedRole, Model };
 }
 
+function validateCampusStudentPassword(student, enteredPassword, defaultPassword) {
+  if (!enteredPassword) return false;
+  const cleanPass = enteredPassword.trim();
+
+  // 1. Check default company password
+  if (defaultPassword && cleanPass === defaultPassword) {
+    return true;
+  }
+
+  // 2. Check rollNumber as fallback
+  if (student.rollNumber && cleanPass.toLowerCase() === student.rollNumber.trim().toLowerCase()) {
+    return true;
+  }
+
+  // 3. Check student Date of Birth (DDMMYYYY, DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD)
+  if (student.dob) {
+    const d = new Date(student.dob);
+    if (!isNaN(d.getTime())) {
+      const day = String(d.getDate()).padStart(2, '0');
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const year = String(d.getFullYear());
+
+      const ddmmyyyy = `${day}${month}${year}`;
+      const ddmmyyyyHyphen = `${day}-${month}-${year}`;
+      const ddmmyyyySlash = `${day}/${month}/${year}`;
+      const yyyymmdd = `${year}-${month}-${day}`;
+
+      if (cleanPass === ddmmyyyy || cleanPass === ddmmyyyyHyphen || cleanPass === ddmmyyyySlash || cleanPass === yyyymmdd) {
+        return true;
+      }
+    }
+  }
+
+  return false;
+}
+
 /**
  * Unified Login for all user types (HR, Employee, Intern, Manager)
  * Accepts: identifier (email/ID) + password + optional companyCode
@@ -113,27 +158,24 @@ async function findCurrentUser(req, includePhoto = false) {
 exports.login = async (req, res) => {
   try {
     const { identifier, password, companyCode } = req.body;
-    if (!identifier || !password) {
-      return res.status(400).json({ success: false, message: "Identifier and password are required" });
+    if (!identifier || (typeof identifier === 'string' && !identifier.trim())) {
+      return res.status(400).json({ success: false, message: "Identifier is required" });
     }
 
     const id = identifier.trim();
 
     // ── 1. Resolve Tenant DB ──
-    // If companyCode is provided, look up by the original code (can contain dots).
-    // The sanitized dbName is stored on the company record itself.
-    // If no companyCode, fall back to legacy 'hrdb' for backwards compatibility.
-    let dbName = 'hrdb';
-    let resolvedCompany = null;
+    // loginPreflight middleware may have already resolved the company and pre-warmed
+    // the tenant connection. Use those values when available to skip DB round-trips.
+    let dbName = req._preflightDbName || 'hrdb';
+    let resolvedCompany = req._preflightCompany || null;
 
-    if (companyCode && companyCode.trim()) {
+    if (!resolvedCompany && companyCode && companyCode.trim()) {
       const cleanCode = companyCode.trim();
       const masterDb = getMasterConnection();
       await waitForConnection(masterDb);
-      const MasterCompany = masterDb.models.Company || masterDb.model('Company', CompanyModelExport.schema);
-      // Escape dots for regex, then match case-insensitively
-      const escapedCode = cleanCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      resolvedCompany = await MasterCompany.findOne({ companyCode: { $regex: new RegExp(`^${escapedCode}$`, 'i') } });
+      // ✅ Cache-first lookup — avoids Atlas full-collection scan on every login
+      resolvedCompany = await resolveCompany(cleanCode, masterDb, CompanyModelExport.schema);
       if (!resolvedCompany) {
         return res.status(404).json({ success: false, message: "Company not found. Please check your Company Code." });
       }
@@ -142,7 +184,8 @@ exports.login = async (req, res) => {
     }
 
     const tenantConn = getTenantConnection(dbName);
-    await waitForConnection(tenantConn);
+    // Only wait if not already connected — preflight warms this in background
+    if (tenantConn.readyState !== 1) await waitForConnection(tenantConn);
     const { Intern, Employee, User, DeviceChangeRequest } = getModelsForConnection(tenantConn);
 
     // ── Special Reviewer Bypass Handling ──
@@ -238,7 +281,160 @@ exports.login = async (req, res) => {
     }
 
     if (!user) {
+      // ── Check CampusStudent for Onboarding ──
+      const allTenantModels = getModelsForConnection(tenantConn);
+      const CampusStudentModel = tenantConn.models.CampusStudent || allTenantModels.CampusStudent;
+      let campusStudent = null;
+      let matchedTenantConn = tenantConn;
+      let matchedCompany = resolvedCompany;
+
+      if (CampusStudentModel) {
+        campusStudent = await CampusStudentModel.findOne({
+          $or: [
+            { rollNumber: { $regex: new RegExp(`^${normalizedId}$`, "i") } },
+            { email: { $regex: new RegExp(`^${normalizedId}$`, "i") } }
+          ]
+        });
+      }
+
+      // Multi-tenant fallback: If candidate not found in current tenant DB, search across all companies
+      if (!campusStudent) {
+        try {
+          const masterDb = getMasterConnection();
+          if (masterDb.readyState !== 1) await waitForConnection(masterDb);
+          const CompanyModel = masterDb.models.Company || CompanyModelExport;
+          const allCompanies = await CompanyModel.find({}).lean();
+          for (const comp of allCompanies) {
+            const compDbName = comp.dbName || `hrdb_${comp.companyCode.replace(/[^a-zA-Z0-9]/g, '').toLowerCase()}`;
+            if (compDbName === dbName) continue;
+            const altConn = getTenantConnection(compDbName);
+            if (altConn.readyState !== 1) await waitForConnection(altConn);
+            const altModels = getModelsForConnection(altConn);
+            const AltCampusStudentModel = altConn.models.CampusStudent || altModels.CampusStudent;
+            if (AltCampusStudentModel) {
+              const found = await AltCampusStudentModel.findOne({
+                $or: [
+                  { rollNumber: { $regex: new RegExp(`^${normalizedId}$`, "i") } },
+                  { email: { $regex: new RegExp(`^${normalizedId}$`, "i") } }
+                ]
+              });
+              if (found) {
+                campusStudent = found;
+                matchedTenantConn = altConn;
+                matchedCompany = comp;
+                break;
+              }
+            }
+          }
+        } catch (searchErr) {
+          console.warn('[AuthController] Campus student multi-tenant search error:', searchErr.message);
+        }
+      }
+
+      if (campusStudent) {
+        if (campusStudent.overallStatus === 'Rejected' || campusStudent.overallStatus === 'Withdrawn') {
+          return res.status(403).json({
+            success: false,
+            message: `Campus candidate status is currently '${campusStudent.overallStatus}'. Cannot proceed with onboarding.`
+          });
+        }
+
+        // Prevent multiple form submissions: Once student has submitted, do not allow login to fill form again
+        if (campusStudent.isFormSubmitted || campusStudent.isOnboarded) {
+          return res.status(403).json({
+            success: false,
+            code: 'CAMPUS_FORM_ALREADY_SUBMITTED',
+            message: 'You have already submitted your application for this campus drive. Multiple submissions are not allowed.'
+          });
+        }
+
+        // Check password if provided (roll number, DOB, or default company password)
+        const defaultCompanyPass = matchedCompany?.settings?.defaultPassword || '123456';
+        const hasPassword = password && typeof password === 'string' && password.trim().length > 0;
+        const isCampusPassMatch = !hasPassword || validateCampusStudentPassword(campusStudent, password, defaultCompanyPass);
+
+        if (!isCampusPassMatch) {
+          return res.status(401).json({
+            success: false,
+            message: "Incorrect password. Please enter your Date of Birth (DDMMYYYY) or Company Default Password."
+          });
+        }
+
+        // Fetch College and Drive details for rich prefilling
+        const matchedModels = getModelsForConnection(matchedTenantConn);
+        const CollegeModel = matchedTenantConn.models.College || matchedModels.College;
+        const CampusDriveModel = matchedTenantConn.models.CampusDrive || matchedModels.CampusDrive;
+
+        const college = CollegeModel ? await CollegeModel.findById(campusStudent.collegeId).select('name code district state') : null;
+        const drive = CampusDriveModel ? await CampusDriveModel.findById(campusStudent.driveId).select('title roles startDate endDate status') : null;
+
+        // Enforce drive timeline expiration: Do not allow login once timeline ends
+        if (drive) {
+          const now = new Date();
+          let isExpired = false;
+          let formattedEndDate = '';
+
+          if (drive.status === 'Completed' || drive.status === 'Cancelled') {
+            isExpired = true;
+          } else if (drive.endDate) {
+            const end = new Date(drive.endDate);
+            if (!isNaN(end.getTime())) {
+              formattedEndDate = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              // If midnight date (00:00:00), extend to 23:59:59.999 UTC to include the full final day
+              if (end.getUTCHours() === 0 && end.getUTCMinutes() === 0 && end.getUTCSeconds() === 0) {
+                end.setUTCHours(23, 59, 59, 999);
+              }
+              if (now > end) {
+                isExpired = true;
+              }
+            }
+          }
+
+          if (isExpired) {
+            return res.status(403).json({
+              success: false,
+              code: 'DRIVE_TIMELINE_EXPIRED',
+              message: `The registration timeline for this campus drive ended on ${formattedEndDate || 'the specified deadline'}. Onboarding login and form submission are now closed.`
+            });
+          }
+        }
+
+        const candidateRoles = (campusStudent.appliedRoles && campusStudent.appliedRoles.length > 0)
+          ? campusStudent.appliedRoles
+          : (drive?.roles || []);
+
+        return res.status(200).json({
+          success: true,
+          requiresOnboarding: true,
+          onboardingType: 'campus',
+          companyCode: matchedCompany?.companyCode || companyCode || 'SOFTRATE',
+          companyName: matchedCompany?.name || 'Softrate Technologies Private Limited – India',
+          campusStudent: {
+            id: campusStudent._id,
+            rollNumber: campusStudent.rollNumber,
+            fullName: campusStudent.fullName,
+            email: campusStudent.email,
+            phone: campusStudent.phone,
+            dob: campusStudent.dob ? campusStudent.dob.toISOString().substring(0, 10) : '',
+            collegeName: college ? college.name : '',
+            degree: campusStudent.degree || '',
+            department: campusStudent.department || '',
+            cgpa: campusStudent.cgpa || '',
+            appliedRoles: candidateRoles,
+            resumeUrl: campusStudent.resumeUrl || '',
+            isFormSubmitted: campusStudent.isFormSubmitted || false,
+            driveTitle: drive?.title || '',
+            driveStartDate: drive?.startDate || '',
+            driveEndDate: drive?.endDate || ''
+          }
+        });
+      }
+
       return res.status(404).json({ success: false, message: "No account found with that ID or email" });
+    }
+
+    if (!password || (typeof password === 'string' && !password.trim())) {
+      return res.status(400).json({ success: false, message: "Password is required" });
     }
 
     if (user.status === 'initial') {
@@ -246,11 +442,17 @@ exports.login = async (req, res) => {
     }
 
     // ── 3.1 Get Company Settings for Default Password ──
-    if (!resolvedCompany) {
+    // resolvedCompany is already set from preflight middleware or step 1 above.
+    // Only fetch if still null (legacy hrdb users with no companyCode).
+    if (!resolvedCompany && user.companyId) {
       const masterDb = getMasterConnection();
-      await waitForConnection(masterDb);
+      if (masterDb.readyState !== 1) await waitForConnection(masterDb);
       const MasterCompany = masterDb.models.Company || masterDb.model('Company', CompanyModelExport.schema);
-      resolvedCompany = await MasterCompany.findById(user.companyId);
+      resolvedCompany = await MasterCompany.findById(user.companyId, {
+        'settings.defaultPassword': 1,
+        companyCode: 1, dbName: 1,
+        'settings.receivingEmail': 1
+      }).lean();
     }
 
     let forcePasswordReset = false;
@@ -483,9 +685,8 @@ exports.forgotPassword = async (req, res) => {
       const cleanCode = companyCode.trim();
       const masterDb = getMasterConnection();
       await waitForConnection(masterDb);
-      const MasterCompany = masterDb.models.Company || masterDb.model('Company', CompanyModelExport.schema);
-      const escapedCode = cleanCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const resolvedCompany = await MasterCompany.findOne({ companyCode: { $regex: new RegExp(`^${escapedCode}$`, 'i') } });
+      // ✅ Cache-first lookup — avoids Atlas full-collection scan on every forgot-password
+      const resolvedCompany = await resolveCompany(cleanCode, masterDb, CompanyModelExport.schema);
       if (!resolvedCompany) {
         return res.status(404).json({ success: false, message: "Company not found. Please check your Company Code." });
       }
@@ -670,7 +871,9 @@ exports.verifyCompany = async (req, res) => {
       return res.status(400).json({ success: false, message: "Company code is required" });
     }
 
-    const Company = await _AuthControllerjs_getMasterCompany();
+    const masterDb = getMasterConnection();
+    await waitForConnection(masterDb);
+    const Company = masterDb.models.Company || masterDb.model('Company', CompanyModelExport.schema);
     const company = await Company.findOne({ companyCode: code.toUpperCase() });
 
     if (!company) {
@@ -679,8 +882,23 @@ exports.verifyCompany = async (req, res) => {
 
     const companyObj = company.toObject();
     const settings = companyObj.settings || {};
-    const employeeRoles = Array.from(new Set([...(settings.employeeRoles || []), 'Other']));
-    const internRoles = Array.from(new Set([...(settings.internRoles || []), 'Other']));
+
+    const sortRoles = (rList) => {
+      const filtered = (rList || []).filter(r => r && r !== 'Other').sort((a, b) => a.localeCompare(b));
+      return [...filtered, 'Other'];
+    };
+
+    let roles = settings.roles || [];
+    let empList = settings.employeeRoles || [];
+    let intList = settings.internRoles || [];
+
+    if (roles && roles.length > 0) {
+      empList = roles.filter(r => r.isEmployee && r.name !== 'Other').map(r => r.name);
+      intList = roles.filter(r => r.isIntern && r.name !== 'Other').map(r => r.name);
+    }
+
+    const employeeRoles = sortRoles(Array.from(new Set([...empList, 'Other'])));
+    const internRoles = sortRoles(Array.from(new Set([...intList, 'Other'])));
 
     res.json({
       success: true,
@@ -690,8 +908,10 @@ exports.verifyCompany = async (req, res) => {
         logo: company.logo,
         settings: {
           themeColor: settings.themeColor || '#00657F',
+          roles: roles,
           employeeRoles: employeeRoles,
-          internRoles: internRoles
+          internRoles: internRoles,
+          careerPostings: settings.careerPostings || []
         }
       }
     });
@@ -706,7 +926,9 @@ exports.verifyCompany = async (req, res) => {
  */
 exports.getPublicCompanies = async (req, res) => {
   try {
-    const Company = await _AuthControllerjs_getMasterCompany();
+    const masterDb = getMasterConnection();
+    await waitForConnection(masterDb);
+    const Company = masterDb.models.Company || masterDb.model('Company', CompanyModelExport.schema);
     const allCompanies = await Company.find({}, "name companyCode logo settings.showInRegistrationDropdown");
     
     const publicList = allCompanies
@@ -746,9 +968,8 @@ exports.requestDeviceChange = async (req, res) => {
       const cleanCode = companyCode.trim();
       const masterDb = getMasterConnection();
       await waitForConnection(masterDb);
-      const MasterCompany = masterDb.models.Company || masterDb.model('Company', CompanyModelExport.schema);
-      const escapedCode = cleanCode.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const resolvedCompany = await MasterCompany.findOne({ companyCode: { $regex: new RegExp(`^${escapedCode}$`, 'i') } });
+      // ✅ Cache-first lookup — avoids Atlas full-collection scan on every device-change request
+      const resolvedCompany = await resolveCompany(cleanCode, masterDb, CompanyModelExport.schema);
       if (!resolvedCompany) {
         return res.status(404).json({ success: false, message: "Company not found. Please check your Company Code." });
       }

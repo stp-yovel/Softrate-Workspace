@@ -37,7 +37,7 @@ export class InternDetails implements OnInit {
   terminationReason = signal('');
   isResendingMail = signal(false);
   isResendingOffboardingMail = signal(false);
-  
+
   // Offboarding Modal State
   showOffboardingModal = signal(false);
   onboardingDate = signal<string>('');
@@ -48,6 +48,13 @@ export class InternDetails implements OnInit {
 
   userRole = signal<string | null>(localStorage.getItem('user_role'));
   readonly isDevMode = isDevMode();
+
+  // LMS Courses Mapping State
+  assignedCourses = signal<any[]>([]);
+  availableCourses = signal<any[]>([]);
+  showAssignCourseModal = signal(false);
+  selectedCourseIdToAssign = signal('');
+  isAssigningCourse = signal(false);
 
   navigateTo(path: string[]) {
     this.router.navigate(path).then(() => {
@@ -73,249 +80,346 @@ export class InternDetails implements OnInit {
   ngOnInit() {
     this.internId.set(this.route.snapshot.paramMap.get('id') || '');
     this.fetchDetails();
+    this.loadLMSCourses();
   }
+
+  loadLMSCourses() {
+      const actualId = this.intern()?._id || this.internId();
+      if(!actualId) return;
+      this.apiService.getUserLMSCourses(actualId).subscribe({
+        next: (res: any) => {
+          this.assignedCourses.set(res?.data || []);
+        },
+        error: (err: any) => console.error('Failed to load intern LMS courses', err)
+      });
+
+      this.apiService.getLMSCourses().subscribe({
+        next: (res: any) => {
+          this.availableCourses.set(res?.data || []);
+        },
+        error: (err: any) => console.error('Failed to load LMS courses catalog', err)
+      });
+    }
+
+  openAssignCourseModal() {
+      this.selectedCourseIdToAssign.set('');
+      this.showAssignCourseModal.set(true);
+    }
+
+  closeAssignCourseModal() {
+      this.showAssignCourseModal.set(false);
+    }
+
+  assignCourseToIntern() {
+      const courseId = this.selectedCourseIdToAssign();
+      if(!courseId) return;
+
+      const actualId = this.intern()?._id || this.internId();
+      this.isAssigningCourse.set(true);
+      this.apiService.assignLMSCourse({
+        courseId,
+        userId: actualId,
+        userType: 'intern',
+        userEmail: this.intern()?.email || '',
+        userName: this.intern()?.fullName || '',
+      }).subscribe({
+        next: () => {
+          this.isAssigningCourse.set(false);
+          this.showAssignCourseModal.set(false);
+          this.alertService.success('Course mapped to intern successfully.');
+          this.loadLMSCourses();
+        },
+        error: (err: any) => {
+          this.isAssigningCourse.set(false);
+          this.alertService.error(err?.error?.message || 'Failed to map course.');
+        }
+      });
+    }
 
   fetchDetails() {
-    this.isLoading.set(true);
-    this.apiService.getInternById(this.internId()).subscribe({
-      next: (data) => {
-        console.log('Intern details received:', data);
-        this.intern.set(data);
-        this.isLoading.set(false);
-      },
-      error: (err) => {
-        console.error('Failed to fetch intern details', err);
-        this.isLoading.set(false);
-      }
-    });
-  }
+      this.isLoading.set(true);
+      this.apiService.getInternById(this.internId()).subscribe({
+        next: (data) => {
+          console.log('Intern details received:', data);
+          this.intern.set(data);
+          this.isLoading.set(false);
+          this.loadLMSCourses();
+        },
+        error: (err) => {
+          console.error('Failed to fetch intern details', err);
+          this.isLoading.set(false);
+        }
+      });
+    }
 
   getStatusColor(status: string): string {
-    switch(status?.toLowerCase()) {
+      switch(status?.toLowerCase()) {
       case 'active': return 'status-green';
       case 'initial': return 'status-blue';
       case 'completed': return 'status-teal';
       default: return 'status-gray';
-    }
+}
   }
 
-  canConvert(): boolean {
-    const role = this.userRole()?.toLowerCase();
-    const status = this.intern()?.status?.toLowerCase();
-    // Managers, HR, and HR_ADMIN can convert active interns
-    const isAuthorized = role === 'manager' || role === 'hr' || role === 'hr_admin';
-    return isAuthorized && status !== 'completed';
-  }
+canConvert(): boolean {
+  const role = this.userRole()?.toLowerCase();
+  const status = this.intern()?.status?.toLowerCase();
+  // Managers, HR, and HR_ADMIN can convert active interns
+  const isAuthorized = role === 'manager' || role === 'hr' || role === 'hr_admin';
+  return isAuthorized && status !== 'completed';
+}
 
-  canConvertToHr(): boolean {
-    const role = this.userRole()?.toLowerCase();
-    // Only HR_ADMIN can convert others to HR
-    return role === 'hr_admin';
-  }
+canConvertToHr(): boolean {
+  const role = this.userRole()?.toLowerCase();
+  // Only HR_ADMIN can convert others to HR
+  return role === 'hr_admin';
+}
 
   async convertToEmployee() {
-    if (!await this.alertService.confirm('Are you sure you want to promote this intern to a full-time employee?')) return;
+  if (!await this.alertService.confirm('Are you sure you want to promote this intern to a full-time employee?')) return;
 
-    this.isConverting.set(true);
-    this.apiService.convertInternToEmployee(this.internId()).subscribe({
-      next: () => {
-        this.alertService.show('Intern promoted to employee successfully!');
-        this.router.navigate(['/employees']);
-      },
-      error: (err: any) => {
-        this.alertService.show('Failed to convert: ' + (err.error?.message || err.message));
-        this.isConverting.set(false);
-      }
-    });
-  }
+  this.isConverting.set(true);
+  this.apiService.convertInternToEmployee(this.internId()).subscribe({
+    next: () => {
+      this.alertService.show('Intern promoted to employee successfully!');
+      this.router.navigate(['/employees']);
+    },
+    error: (err: any) => {
+      this.alertService.show('Failed to convert: ' + (err.error?.message || err.message));
+      this.isConverting.set(false);
+    }
+  });
+}
 
   async convertToHr() {
-    if (!await this.alertService.confirm('Convert this intern to HR? They will gain admin dashboard access.')) return;
-    this.isConverting.set(true);
-    this.apiService.convertToHr(this.internId()).subscribe({
-      next: () => {
-        this.alertService.show('Intern converted to HR successfully!');
-        this.router.navigate(['/dashboard']);
-      },
-      error: (err: any) => {
-        this.alertService.show('Conversion failed: ' + (err.error?.message || err.message));
-        this.isConverting.set(false);
-      }
-    });
-  }
-
-  editProfile() {
-    this.router.navigate(['/interns/add', this.internId()], { queryParams: { edit: 'true' } });
-  }
-
-  canTerminate(): boolean {
-    const role = this.userRole()?.toLowerCase();
-    const isHr = this.intern()?.isHr;
-    if (isHr) {
-      return role === 'hr_admin';
+  if (!await this.alertService.confirm('Convert this intern to HR? They will gain admin dashboard access.')) return;
+  this.isConverting.set(true);
+  this.apiService.convertToHr(this.internId()).subscribe({
+    next: () => {
+      this.alertService.show('Intern converted to HR successfully!');
+      this.router.navigate(['/dashboard']);
+    },
+    error: (err: any) => {
+      this.alertService.show('Conversion failed: ' + (err.error?.message || err.message));
+      this.isConverting.set(false);
     }
-    return role === 'hr' || role === 'hr_admin';
-  }
+  });
+}
 
-  toggleTerminateForm() {
-    this.showTerminateForm.set(!this.showTerminateForm());
-    if (!this.showTerminateForm()) {
-      this.terminationReason.set('');
+editProfile() {
+  this.router.navigate(['/interns/add', this.internId()], { queryParams: { edit: 'true' } });
+}
+
+canTerminate(): boolean {
+  const role = this.userRole()?.toLowerCase();
+  const isHr = this.intern()?.isHr;
+  if (isHr) {
+    return role === 'hr_admin';
+  }
+  return role === 'hr' || role === 'hr_admin';
+}
+
+toggleTerminateForm() {
+  this.showTerminateForm.set(!this.showTerminateForm());
+  if (!this.showTerminateForm()) {
+    this.terminationReason.set('');
+  }
+}
+
+toggleRemoteAccess() {
+  const isNowRemote = !this.intern().isRemote;
+  // Optimistic update
+  this.intern.update(curr => ({ ...curr, isRemote: isNowRemote }));
+
+  this.apiService.updateIntern(this.internId(), { isRemote: isNowRemote }).subscribe({
+    next: () => {
+      this.alertService.show(`Remote access ${isNowRemote ? 'enabled' : 'disabled'}`);
+    },
+    error: (err: any) => {
+      console.error('Failed to update remote status', err);
+      // Revert on error
+      this.intern.update(curr => ({ ...curr, isRemote: !isNowRemote }));
+      const errMsg = err?.error?.message || err?.message || 'Unknown error';
+      this.alertService.show(`Failed to update remote status: ${errMsg}`);
     }
-  }
+  });
+}
 
-  toggleRemoteAccess() {
-    const isNowRemote = !this.intern().isRemote;
-    // Optimistic update
-    this.intern.update(curr => ({ ...curr, isRemote: isNowRemote }));
+toggleWebAccess() {
+  const isNowWebAccess = !this.intern().webAccess;
+  // Optimistic update
+  this.intern.update(curr => ({ ...curr, webAccess: isNowWebAccess }));
 
-    this.apiService.updateIntern(this.internId(), { isRemote: isNowRemote }).subscribe({
-      next: () => {
-        this.alertService.show(`Remote access ${isNowRemote ? 'enabled' : 'disabled'}`);
-      },
-      error: (err: any) => {
-        console.error('Failed to update remote status', err);
-        // Revert on error
-        this.intern.update(curr => ({ ...curr, isRemote: !isNowRemote }));
-        const errMsg = err?.error?.message || err?.message || 'Unknown error';
-        this.alertService.show(`Failed to update remote status: ${errMsg}`);
-      }
-    });
-  }
-
-  toggleWebAccess() {
-    const isNowWebAccess = !this.intern().webAccess;
-    // Optimistic update
-    this.intern.update(curr => ({ ...curr, webAccess: isNowWebAccess }));
-
-    this.apiService.updateIntern(this.internId(), { webAccess: isNowWebAccess }).subscribe({
-      next: () => {
-        this.alertService.show(`Web access ${isNowWebAccess ? 'enabled' : 'disabled'}`);
-      },
-      error: (err: any) => {
-        console.error('Failed to update web access', err);
-        // Revert on error
-        this.intern.update(curr => ({ ...curr, webAccess: !isNowWebAccess }));
-        const errMsg = err?.error?.message || err?.message || 'Unknown error';
-        this.alertService.show(`Failed to update web access: ${errMsg}`);
-      }
-    });
-  }
+  this.apiService.updateIntern(this.internId(), { webAccess: isNowWebAccess }).subscribe({
+    next: () => {
+      this.alertService.show(`Web access ${isNowWebAccess ? 'enabled' : 'disabled'}`);
+    },
+    error: (err: any) => {
+      console.error('Failed to update web access', err);
+      // Revert on error
+      this.intern.update(curr => ({ ...curr, webAccess: !isNowWebAccess }));
+      const errMsg = err?.error?.message || err?.message || 'Unknown error';
+      this.alertService.show(`Failed to update web access: ${errMsg}`);
+    }
+  });
+}
 
   async terminateIntern() {
-    if (!this.terminationReason().trim()) {
-      this.alertService.show("Please provide a reason for termination.");
-      return;
-    }
-    
-    if (!await this.alertService.confirm('Are you sure you want to terminate this intern? This action will disable their login access.')) return;
-
-    this.isTerminating.set(true);
-    this.apiService.terminateStaff(this.internId(), 'intern', this.terminationReason()).subscribe({
-      next: () => {
-        this.alertService.show('Intern terminated successfully!');
-        this.fetchDetails();
-        this.isTerminating.set(false);
-        this.showTerminateForm.set(false);
-      },
-      error: (err: any) => {
-        this.alertService.show('Termination failed: ' + (err.error?.message || err.message));
-        this.isTerminating.set(false);
-      }
-    });
+  if (!this.terminationReason().trim()) {
+    this.alertService.show("Please provide a reason for termination.");
+    return;
   }
+
+  if (!await this.alertService.confirm('Are you sure you want to terminate this intern? This action will disable their login access.')) return;
+
+  this.isTerminating.set(true);
+  this.apiService.terminateStaff(this.internId(), 'intern', this.terminationReason()).subscribe({
+    next: () => {
+      this.alertService.show('Intern terminated successfully!');
+      this.fetchDetails();
+      this.isTerminating.set(false);
+      this.showTerminateForm.set(false);
+    },
+    error: (err: any) => {
+      this.alertService.show('Termination failed: ' + (err.error?.message || err.message));
+      this.isTerminating.set(false);
+    }
+  });
+}
 
   async resendOnboardingMail() {
-    if (!await this.alertService.confirm('Are you sure you want to resend the onboarding email? This will include the original attachments.')) return;
+  if (!await this.alertService.confirm('Are you sure you want to resend the onboarding email? This will include the original attachments.')) return;
 
-    this.isResendingMail.set(true);
-    this.apiService.resendOnboardingMail(this.intern()._id).subscribe({
-      next: () => {
-        this.alertService.show('Onboarding email resent successfully!');
-        this.isResendingMail.set(false);
-      },
-      error: (err: any) => {
-        this.alertService.show('Failed to resend email: ' + (err.error?.message || err.message));
-        this.isResendingMail.set(false);
-      }
-    });
-  }
-
-  openResendOffboardingModal() {
-    // Set defaults from intern data if available
-    const internData = this.intern();
-    if (internData) {
-      if (internData.onboardingDate) {
-        this.onboardingDate.set(new Date(internData.onboardingDate).toISOString().split('T')[0]);
-      } else if (internData.joiningDate) {
-        this.onboardingDate.set(new Date(internData.joiningDate).toISOString().split('T')[0]);
-      }
-      
-      // We don't have a direct last working day in intern usually, but let's clear it
-      this.endDate.set('');
+  this.isResendingMail.set(true);
+  this.apiService.resendOnboardingMail(this.intern()._id).subscribe({
+    next: () => {
+      this.alertService.show('Onboarding email resent successfully!');
+      this.isResendingMail.set(false);
+    },
+    error: (err: any) => {
+      this.alertService.show('Failed to resend email: ' + (err.error?.message || err.message));
+      this.isResendingMail.set(false);
     }
-    this.certInternship.set(true);
-    this.certProject.set(true);
-    this.certLor.set(true);
-    this.showOffboardingModal.set(true);
-  }
+  });
+}
 
-  closeOffboardingModal() {
-    this.showOffboardingModal.set(false);
+openResendOffboardingModal() {
+  // Set defaults from intern data if available
+  const internData = this.intern();
+  if (internData) {
+    if (internData.onboardingDate) {
+      this.onboardingDate.set(new Date(internData.onboardingDate).toISOString().split('T')[0]);
+    } else if (internData.joiningDate) {
+      this.onboardingDate.set(new Date(internData.joiningDate).toISOString().split('T')[0]);
+    }
+
+    // We don't have a direct last working day in intern usually, but let's clear it
+    this.endDate.set('');
   }
+  this.certInternship.set(true);
+  this.certProject.set(true);
+  this.certLor.set(true);
+  this.showOffboardingModal.set(true);
+}
+
+closeOffboardingModal() {
+  this.showOffboardingModal.set(false);
+}
 
   async resendOffboardingMail() {
-    if (!this.onboardingDate()) {
-      this.alertService.show('Please select an onboarding date.');
-      return;
-    }
-    if (!this.endDate()) {
-      this.alertService.show('Please select an end date (last working day).');
-      return;
-    }
+  if (!this.onboardingDate()) {
+    this.alertService.show('Please select an onboarding date.');
+    return;
+  }
+  if (!this.endDate()) {
+    this.alertService.show('Please select an end date (last working day).');
+    return;
+  }
 
-    const internId = this.intern()?.internid || this.intern()?.internId;
-    if (!internId) {
-      this.alertService.show('Intern ID not found.');
-      return;
-    }
+  const internId = this.intern()?.internid || this.intern()?.internId;
+  if (!internId) {
+    this.alertService.show('Intern ID not found.');
+    return;
+  }
 
-    this.isResendingOffboardingMail.set(true);
-    // Fetch the resignation record by intern ID first, then resend using the resignation _id
-    this.apiService.getResignationByUserId(internId).subscribe({
-      next: (response: any) => {
-        const resignation = response?.data || response;
-        if (!resignation?._id) {
-          this.alertService.show('No accepted offboarding record found for this intern.');
+  this.isResendingOffboardingMail.set(true);
+  // Fetch the resignation record by intern ID first, then resend using the resignation _id
+  this.apiService.getResignationByUserId(internId).subscribe({
+    next: (response: any) => {
+      const resignation = response?.data || response;
+      if (!resignation?._id) {
+        this.alertService.show('No accepted offboarding record found for this intern.');
+        this.isResendingOffboardingMail.set(false);
+        this.closeOffboardingModal();
+        return;
+      }
+
+      const flags = {
+        internship: this.certInternship(),
+        project: this.certProject(),
+        lor: this.certLor(),
+        onboardingDate: this.onboardingDate(),
+        endDate: this.endDate()
+      };
+
+      this.apiService.resendOffboardingMail(resignation._id, flags).subscribe({
+        next: () => {
+          this.alertService.show('Offboarding email resent successfully!');
           this.isResendingOffboardingMail.set(false);
           this.closeOffboardingModal();
-          return;
+        },
+        error: (err: any) => {
+          this.alertService.show('Failed to resend email: ' + (err.error?.message || err.message));
+          this.isResendingOffboardingMail.set(false);
+        }
+      });
+    },
+    error: (err: any) => {
+      this.alertService.show('No offboarding record found: ' + (err.error?.message || err.message));
+      this.isResendingOffboardingMail.set(false);
+    }
+  });
+}
+
+  hasFormOneInfo(): boolean {
+    const d = this.intern();
+    if (!d) return false;
+    return Boolean(
+      (d.currentCtc !== undefined && d.currentCtc !== null && d.currentCtc !== '' && d.currentCtc !== 0) ||
+      (d.expectedCtc !== undefined && d.expectedCtc !== null && d.expectedCtc !== '' && d.expectedCtc !== 0) ||
+      (d.noticePeriod !== undefined && d.noticePeriod !== null && d.noticePeriod !== '') ||
+      d.previousOrg || d.experienceYears || d.isExperienced ||
+      d.degree || d.location || (d.projectLinks && d.projectLinks.length > 0) ||
+      (d.assessmentAnswers && Object.keys(d.assessmentAnswers).length > 0) ||
+      d.shortlist?.interviewEvaluation
+    );
+  }
+
+  getAssessmentEntries(): { label: string; value: string; isLinks: boolean; links: string[] }[] {
+    const answers = this.intern()?.assessmentAnswers;
+    if (!answers || typeof answers !== 'object') return [];
+
+    return Object.entries(answers)
+      .filter(([_, val]) => val !== undefined && val !== null && val !== '')
+      .map(([key, value]) => {
+        const label = key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, str => str.toUpperCase())
+          .trim();
+
+        let rawItems: string[] = [];
+        if (Array.isArray(value)) {
+          rawItems = value.map(v => String(v).trim()).filter(Boolean);
+        } else if (typeof value === 'string' && (value.includes('http://') || value.includes('https://') || value.includes('drive.google.com') || value.includes('github.com') || value.includes('www.'))) {
+          rawItems = value.split(',').map(s => s.trim()).filter(Boolean);
         }
 
-        const flags = {
-          internship: this.certInternship(),
-          project: this.certProject(),
-          lor: this.certLor(),
-          onboardingDate: this.onboardingDate(),
-          endDate: this.endDate()
-        };
+        const isLinks = rawItems.length > 0 && rawItems.every(item => 
+          item.startsWith('http://') || item.startsWith('https://') || item.startsWith('www.') || item.includes('drive.google.com') || item.includes('github.com')
+        );
 
-        this.apiService.resendOffboardingMail(resignation._id, flags).subscribe({
-          next: () => {
-            this.alertService.show('Offboarding email resent successfully!');
-            this.isResendingOffboardingMail.set(false);
-            this.closeOffboardingModal();
-          },
-          error: (err: any) => {
-            this.alertService.show('Failed to resend email: ' + (err.error?.message || err.message));
-            this.isResendingOffboardingMail.set(false);
-          }
-        });
-      },
-      error: (err: any) => {
-        this.alertService.show('No offboarding record found: ' + (err.error?.message || err.message));
-        this.isResendingOffboardingMail.set(false);
-      }
-    });
+        const displayValue = Array.isArray(value) ? value.join(', ') : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+        return { label, value: displayValue, isLinks, links: isLinks ? rawItems : [] };
+      });
   }
 }

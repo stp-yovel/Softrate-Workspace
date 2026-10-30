@@ -1,416 +1,796 @@
 <div class="login-container">
   <!-- Left Branding Panel -->
   <div class="branding-panel">
-    <div class="branding-content">
+    <div class="branding-header">
       <div class="logo-container">
-        <img src="logo/peoplesoft.png" alt="peoplesoft Logo" class="brand-logo-img">
+        <img src="logo/peoplesoft.png" alt="PeopleSoft Logo" class="brand-logo-img">
         <div class="logo-text">PeopleSoft</div>
       </div>
       <span class="crm-tag">Workforce Management</span>
-      <h1>Empowering your team with smart automation.</h1>
-      <p class="branding-desc">Manage attendance, leave, and performance in one unified workspace.</p>
     </div>
-    <div class="branding-bg-circles">
-      <div class="circle circle-1"></div>
-      <div class="circle circle-2"></div>
+
+    <div class="branding-footer-content">
+      <h1>Run the whole organization from one place.</h1>
+      <p class="branding-desc">Empowering your team with smart automation. Manage attendance, leave, and performance in
+        one unified workspace.</p>
     </div>
+
+    <!-- Constellation / network node graphics -->
+    <svg class="constellation-svg" viewBox="0 0 320 320" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <line x1="40" y1="280" x2="110" y2="210" stroke="rgba(255,255,255,0.22)" stroke-width="1.5" />
+      <line x1="110" y1="210" x2="210" y2="250" stroke="rgba(255,255,255,0.22)" stroke-width="1.5" />
+      <line x1="110" y1="210" x2="150" y2="120" stroke="rgba(255,255,255,0.22)" stroke-width="1.5" />
+      <line x1="150" y1="120" x2="250" y2="150" stroke="rgba(255,255,255,0.22)" stroke-width="1.5" />
+      <line x1="210" y1="250" x2="280" y2="190" stroke="rgba(255,255,255,0.22)" stroke-width="1.5" />
+      <line x1="250" y1="150" x2="280" y2="190" stroke="rgba(255,255,255,0.22)" stroke-width="1.5" />
+      <circle cx="40" cy="280" r="4" fill="rgba(255,255,255,0.6)" />
+      <circle cx="110" cy="210" r="5" fill="rgba(255,255,255,0.85)" />
+      <circle cx="210" cy="250" r="4.5" fill="rgba(255,255,255,0.7)" />
+      <circle cx="150" cy="120" r="6" fill="#ffffff" />
+      <circle cx="250" cy="150" r="4.5" fill="rgba(255,255,255,0.6)" />
+      <circle cx="280" cy="190" r="5" fill="rgba(255,255,255,0.75)" />
+    </svg>
   </div>
 
   <!-- Right Form Panel -->
   <div class="form-panel">
     <div class="login-card user-register-card">
-      <div class="form-header">
-        <h2>Applicant Registration</h2>
-        <p>Apply for a position in the verified company.</p>
+      <div class="form-header" *ngIf="!successMessage()">
+        <h2>{{ isCampusStudent ? 'Campus Candidate Registration' : 'Applicant Registration' }}</h2>
+        <p *ngIf="isCampusStudent && campusStudentData?.driveTitle">Applying for <strong>{{ campusStudentData.driveTitle }}</strong> at <strong>{{ verifiedCompanyName() || 'Softrate Technologies Private Limited – India' }}</strong></p>
+        <p *ngIf="!isCampusStudent && (targetRole || role)">Applying for <strong>{{ targetRole || role }}</strong> at <strong>{{
+            verifiedCompanyName() || 'Softrate Technologies Private Limited – India' }}</strong></p>
+        <p *ngIf="!isCampusStudent && !targetRole && !role && isVerified()">Applying to <strong>{{ verifiedCompanyName() || 'Softrate
+            Technologies Private Limited – India' }}</strong></p>
+        <p *ngIf="!isCampusStudent && !targetRole && !role && !isVerified()">Fill in your details below to submit your application.</p>
       </div>
 
-      <div class="error-banner" *ngIf="errorMessage()">
+      <div class="error-banner" *ngIf="errorMessage() && !successMessage()">
         <i class="fa-solid fa-circle-exclamation"></i>
         {{ errorMessage() }}
       </div>
 
-      <div class="success-banner" *ngIf="successMessage()">
-        <i class="fa-solid fa-check-circle"></i>
-        {{ successMessage() }}
+      <!-- Campus Drive Timeline Closed Notice -->
+      <div *ngIf="isDriveTimelineExpired" class="timeline-expired-banner">
+        <svg xmlns="http://www.w3.org/2000/svg" class="alert-icon" fill="none" viewBox="0 0 24 24"
+          stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+        </svg>
+        <div class="banner-content">
+          <strong>Registration Closed</strong>
+          <p>{{ driveTimelineExpiredMessage }}</p>
+        </div>
       </div>
 
-      <form (ngSubmit)="submitForm()" #registerForm="ngForm" autocomplete="off" *ngIf="!successMessage()">
-        
+      <!-- Minimal & Professional Success State -->
+      <div *ngIf="successMessage()">
+        <div class="form-header">
+          <h2>Application Submitted</h2>
+          <p>Your application for <strong>{{ targetRole || role }}</strong> at <strong>{{ verifiedCompanyName() ||
+              'Softrate Technologies Private Limited – India' }}</strong> has been successfully received.</p>
+        </div>
+
+        <a routerLink="/login" class="submit-btn"
+          style="text-decoration: none; text-align: center; display: block; margin-top: 2rem;">
+          Back to Login
+        </a>
+      </div>
+
+      <form (ngSubmit)="openDeclaration()" #registerForm="ngForm" autocomplete="off" *ngIf="!successMessage()">
+
         <!-- Progress Stepper -->
-        <div class="stepper-wrapper">
-          <div class="stepper-item" [class.completed]="currentStep > 1" [class.active]="currentStep === 1">
+        <div class="stepper-wrapper" *ngIf="!isCampusStudent">
+          <div class="stepper-item" *ngIf="!isCampusStudent"
+            [class.completed]="currentStep === 25 || currentStep === 26 || currentStep === 3 || currentStep === 4"
+            [class.active]="currentStep === 2">
             <div class="step-counter">
-               <i class="fa-solid fa-check" *ngIf="currentStep > 1"></i>
-               <span *ngIf="currentStep <= 1">1</span>
+              <i class="fa-solid fa-check"
+                *ngIf="currentStep === 25 || currentStep === 26 || currentStep === 3 || currentStep === 4"></i>
+              <span *ngIf="currentStep === 2">1</span>
             </div>
-            <div class="step-name">Verification</div>
+            <div class="step-name">Role & Track</div>
           </div>
-          <div class="stepper-item" [class.completed]="currentStep > 2" [class.active]="currentStep === 2">
+
+          <div class="stepper-item" [class.completed]="currentStep === 26 || currentStep === 3 || currentStep === 4"
+            [class.active]="currentStep === 25 || currentStep === 26" *ngIf="!isCampusStudent && matchingPosting()">
             <div class="step-counter">
-               <i class="fa-solid fa-check" *ngIf="currentStep > 2"></i>
-               <span *ngIf="currentStep <= 2">2</span>
+              <i class="fa-solid fa-check" *ngIf="currentStep === 26 || currentStep === 3 || currentStep === 4"></i>
+              <span *ngIf="currentStep === 2 || currentStep === 25 || currentStep === 26">2</span>
             </div>
-            <div class="step-name">Role</div>
+            <div class="step-name">{{ isRoleBothEnabled() ? 'Job & Track' : 'Job Details' }}</div>
           </div>
-          <div class="stepper-item" [class.completed]="currentStep > 3" [class.active]="currentStep === 3">
+
+          <div class="stepper-item" [class.completed]="currentStep === 4" [class.active]="currentStep === 3">
             <div class="step-counter">
-               <i class="fa-solid fa-check" *ngIf="currentStep > 3"></i>
-               <span *ngIf="currentStep <= 3">3</span>
+              <i class="fa-solid fa-check" *ngIf="currentStep === 4"></i>
+              <span *ngIf="currentStep !== 4">{{ isCampusStudent ? '1' : (matchingPosting() ? '3' : '2') }}</span>
             </div>
-            <div class="step-name">Form</div>
+            <div class="step-name">{{ isCampusStudent ? 'Application Form' : 'Profile' }}</div>
+          </div>
+
+          <div class="stepper-item" [class.completed]="false" [class.active]="currentStep === 4" *ngIf="hasAssessment">
+            <div class="step-counter">
+              <span>{{ isCampusStudent ? '2' : (matchingPosting() ? '4' : '3') }}</span>
+            </div>
+            <div class="step-name">PreSight</div>
           </div>
         </div>
 
-        <!-- Step 1: Verification -->
-        <div *ngIf="currentStep === 1">
-          <div class="form-group verification-group" style="position: relative;">
-            <label for="companyCode">Company Code *</label>
-            <div class="input-wrapper" style="position: relative;">
-              <input 
-                id="companyCode"
-                type="text" 
-                [(ngModel)]="companyCode" 
-                (focus)="onCompanyInputFocus()"
-                (ngModelChange)="onCompanyInputChange()"
-                placeholder="Type or select company code..."
-                name="companyCode" 
-                autocomplete="off"
-                required>
-              <button type="button" class="verify-btn" (click)="verifyCompany()" [disabled]="isVerifying()">
-                 {{ isVerifying() ? 'Verifying...' : 'Verify' }}
-              </button>
+        <!-- Step 2: Role & Opportunity Selection -->
+        <div *ngIf="currentStep === 2" class="form-scrollable-area">
+          <div class="form-group">
+            <label>Select Opportunity or Role *</label>
+            <p class="role-desc">Select an open drive or role you wish to apply for at {{ verifiedCompanyName() }}.</p>
 
-              <!-- Simple Clean Autocomplete Dropdown List -->
-              <div class="company-dropdown-list" *ngIf="showCompanyDropdown() && filteredCompanies().length > 0">
-                <div 
-                  class="company-dropdown-item" 
-                  *ngFor="let comp of filteredCompanies()" 
-                  (click)="selectCompanyFromDropdown(comp)">
-                  <span class="company-item-name">{{ comp.name }}</span>
+            <div class="role-cards-container">
+              <div *ngIf="isLoadingDrives() || isVerifying()"
+                style="text-align: center; padding: 24px; color: var(--text-muted, #94A3B8); font-size: 0.85rem;">
+                <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 6px;"></i> Loading opportunities...
+              </div>
+
+              <!-- 1. Seasonal Internship Drives (e.g. Winter Internship 2026) - First Card -->
+              <ng-container *ngIf="!isLoadingDrives() && seasonalDrivesOnly().length > 0">
+                <div *ngFor="let drive of seasonalDrivesOnly()" class="role-card"
+                  [class.selected]="selectedRoleCardKey() === 'seasonal_' + (drive._id || drive.id)"
+                  (click)="selectSeasonalDrive(drive)">
+                  <div class="role-icon"><hugeicons-icon [icon]="WorkIcon" size="20" [strokeWidth]="1.8" color="currentColor"></hugeicons-icon></div>
+                  <div class="role-content">
+                    <h4>{{ drive.title || 'Winter Internship' }}</h4>
+                  </div>
+                  <div class="role-check" *ngIf="selectedRoleCardKey() === 'seasonal_' + (drive._id || drive.id)">
+                    <i class="fa-solid fa-check-circle"></i>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- 2. Walk-in Drives -->
+              <ng-container *ngIf="!isLoadingDrives() && walkinDrivesOnly().length > 0">
+                <div *ngFor="let drive of walkinDrivesOnly()" class="role-card"
+                  [class.selected]="selectedRoleCardKey() === 'walkin_' + (drive._id || drive.id)"
+                  (click)="selectWalkinDrive(drive)">
+                  <div class="role-icon"><hugeicons-icon [icon]="WorkIcon" size="20" [strokeWidth]="1.8" color="currentColor"></hugeicons-icon></div>
+                  <div class="role-content">
+                    <h4>Walk-in Drive</h4>
+                    <p *ngIf="drive.endDate || drive.endTime">Ends: {{ formatWalkinEndDate(drive.endDate) }} at {{
+                      drive.endTime || '' }}</p>
+                    <p *ngIf="!drive.endDate && !drive.endTime">Apply for current walk-in opportunities.</p>
+                  </div>
+                  <div class="role-check" *ngIf="selectedRoleCardKey() === 'walkin_' + (drive._id || drive.id)">
+                    <i class="fa-solid fa-check-circle"></i>
+                  </div>
+                </div>
+              </ng-container>
+
+              <!-- 3. Published Roles from career postings -->
+              <ng-container *ngIf="!isVerifying() && displayRoles().length > 0">
+                <div *ngFor="let posting of displayRoles()" class="role-card"
+                  [class.selected]="selectedRoleCardKey() === 'role_' + posting.title"
+                  (click)="selectRoleCard(posting)">
+                  <div class="role-icon">
+                    <hugeicons-icon [icon]="WorkIcon" size="20" [strokeWidth]="1.8" color="currentColor"></hugeicons-icon>
+                  </div>
+                  <div class="role-content">
+                    <h4>{{ posting.title }}</h4>
+                    <p>{{ (posting.department || posting.categoryName || 'Software Engineering') + (posting.workType ? '
+                      • ' + posting.workType : '') }}</p>
+                  </div>
+                  <div class="role-check" *ngIf="selectedRoleCardKey() === 'role_' + posting.title">
+                    <i class="fa-solid fa-check-circle"></i>
+                  </div>
+                </div>
+              </ng-container>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('role')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('role') }}
+            </div>
+          </div>
+
+          <div class="step-actions">
+            <button type="button" class="btn btn-secondary" (click)="prevStep()"
+              [disabled]="isVerifying()">Back</button>
+            <button type="button" class="submit-btn step-next-btn" (click)="nextStep()"
+              [disabled]="isVerifying() || !selectedRoleCardKey()">
+              Continue
+            </button>
+          </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- STEP 2.5: JOB DESCRIPTION (JD) PREVIEW     -->
+        <!-- ========================================== -->
+        <div *ngIf="currentStep === 25 && matchingPosting()" class="form-scrollable-area">
+          <div class="jd-preview-card">
+            <div class="jd-header-badges">
+              <span class="jd-badge" *ngIf="!isCampusStudent">{{ matchingPosting().workType || 'Full-Time' }}</span>
+              <span class="jd-badge jd-badge-location" *ngIf="matchingPosting().location">{{ matchingPosting().location
+                }}</span>
+              <span class="jd-badge jd-badge-location" *ngIf="matchingPosting().department">{{
+                matchingPosting().department }}</span>
+            </div>
+            <h3 class="jd-title">{{ matchingPosting().title }}</h3>
+            <p class="jd-department" *ngIf="matchingPosting().department">Department: {{ matchingPosting().department }}
+            </p>
+
+            <div *ngIf="matchingPosting().shortSummary || matchingPosting().about">
+              <h4 class="jd-section-title">About the Role</h4>
+              <p class="jd-text">{{ matchingPosting().shortSummary || matchingPosting().about }}</p>
+            </div>
+
+            <div *ngIf="matchingPosting().responsibilities?.length > 0">
+              <h4 class="jd-section-title">Key Responsibilities</h4>
+              <ul class="jd-list">
+                <li *ngFor="let item of matchingPosting().responsibilities">{{ item }}</li>
+              </ul>
+            </div>
+
+            <div *ngIf="matchingPosting().requirements?.length > 0">
+              <h4 class="jd-section-title">Requirements & Skills</h4>
+              <ul class="jd-list">
+                <li *ngFor="let req of matchingPosting().requirements">{{ req }}</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="step-actions">
+            <button type="button" class="btn btn-secondary" (click)="prevStep()">Back</button>
+            <button type="button" class="submit-btn step-next-btn" (click)="nextStep()">
+              Apply for this Role
+            </button>
+          </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- STEP 26: TRACK SELECTION (IF BOTH ENABLED) -->
+        <!-- ========================================== -->
+        <div *ngIf="currentStep === 26" class="form-scrollable-area">
+          <div class="form-group">
+            <label>Select Application Track *</label>
+            <p class="role-desc">Choose whether you are applying for Full-Time Employee or an Internship for {{ role }}.
+            </p>
+
+            <div class="role-cards-container">
+              <div class="role-card" [class.selected]="applicationType === 'Employee'"
+                (click)="applicationType = 'Employee'">
+                <div class="role-icon"><hugeicons-icon [icon]="WorkIcon" size="20" [strokeWidth]="1.8" color="currentColor"></hugeicons-icon></div>
+                <div class="role-content">
+                  <h4>Full-Time Employee</h4>
+                  <p>Direct full-time employment with company salary & benefits</p>
+                </div>
+                <div class="role-check" *ngIf="applicationType === 'Employee'">
+                  <i class="fa-solid fa-check-circle"></i>
+                </div>
+              </div>
+
+              <div class="role-card" [class.selected]="applicationType === 'Internship'"
+                (click)="applicationType = 'Internship'">
+                <div class="role-icon"><i class="fa-solid fa-graduation-cap"></i></div>
+                <div class="role-content">
+                  <h4>Internship</h4>
+                  <p>Internship program with practical project exposure & stipend</p>
+                </div>
+                <div class="role-check" *ngIf="applicationType === 'Internship'">
+                  <i class="fa-solid fa-check-circle"></i>
                 </div>
               </div>
             </div>
           </div>
+
+          <div class="step-actions">
+            <button type="button" class="btn btn-secondary" (click)="prevStep()">Back</button>
+            <button type="button" class="submit-btn step-next-btn" (click)="nextStep()">
+              Continue
+            </button>
+          </div>
         </div>
 
-        <!-- Verified Indicator (Shows in Step 2 and 3) -->
-        <div class="verified-badge" *ngIf="isVerified()">
-           <i class="fa-solid fa-check-circle"></i> Applying to: {{ verifiedCompanyName() }}
-        </div>
-
-        <!-- Step 2: Role Selection -->
-        <div *ngIf="currentStep === 2" class="form-scrollable-area">
-           <!-- Application Type Cards -->
-           <div class="form-group">
-             <label>Select Role Type</label>
-             <p class="role-desc">Which application type best describes you?</p>
-              <div class="role-cards-container">
-                 
-                 <!-- Walk-in Drive Cards (only shown if company has active walkin drives, matching Flutter mobile logic) -->
-                 <div *ngIf="isLoadingDrives()" style="text-align: center; padding: 10px; color: var(--text-muted, #94A3B8); font-size: 0.85rem;">
-                    Checking walk-in opportunities...
-                 </div>
-
-                 <ng-container *ngIf="!isLoadingDrives() && walkinDrives().length > 0">
-                   <div *ngFor="let drive of walkinDrives()" 
-                        class="role-card" 
-                        [class.selected]="applicationType === 'Walkin' && selectedWalkinDriveId === (drive._id || drive.id)" 
-                        (click)="selectWalkinDrive(drive)">
-                      <div class="role-icon"><i class="fa-solid fa-calendar-check"></i></div>
-                      <div class="role-content">
-                         <h4>Walk-in Drive</h4>
-                         <p *ngIf="drive.endDate || drive.endTime">Ends: {{ formatWalkinEndDate(drive.endDate) }} at {{ drive.endTime || '' }}</p>
-                         <p *ngIf="!drive.endDate && !drive.endTime">Apply for current walk-in opportunities.</p>
-                      </div>
-                      <div class="role-check" *ngIf="applicationType === 'Walkin' && selectedWalkinDriveId === (drive._id || drive.id)"><i class="fa-solid fa-check-circle"></i></div>
-                   </div>
-                 </ng-container>
-
-                 <div class="role-card" [class.selected]="applicationType === 'Internship'" (click)="selectRoleType('Internship')">
-                    <div class="role-icon"><i class="fa-solid fa-graduation-cap"></i></div>
-                    <div class="role-content">
-                       <h4>Internship</h4>
-                       <p>For students seeking learning opportunities.</p>
-                    </div>
-                    <div class="role-check" *ngIf="applicationType === 'Internship'"><i class="fa-solid fa-check-circle"></i></div>
-                 </div>
-
-                 <div class="role-card" [class.selected]="applicationType === 'Employee'" (click)="selectRoleType('Employee')">
-                    <div class="role-icon"><i class="fa-solid fa-briefcase"></i></div>
-                    <div class="role-content">
-                       <h4>Full-Time Job</h4>
-                       <p>For professionals seeking career growth.</p>
-                    </div>
-                    <div class="role-check" *ngIf="applicationType === 'Employee'"><i class="fa-solid fa-check-circle"></i></div>
-                 </div>
-
-              </div>
-           </div>
-           
-           <div class="step-actions">
-              <button type="button" class="btn btn-secondary" (click)="prevStep()">Back</button>
-              <button type="button" class="submit-btn step-next-btn" (click)="nextStep()" [disabled]="!applicationType">
-                 Continue
-              </button>
-           </div>
-        </div>
-
-        <!-- Step 3: Form fields -->
+        <!-- ========================================== -->
+        <!-- STEP 3: CANDIDATE PROFILE & EXPERIENCE     -->
+        <!-- ========================================== -->
         <div *ngIf="currentStep === 3" class="form-scrollable-area">
 
-           <!-- ===== INTERN / WALKIN FORM (matches form_one.dart) ===== -->
-           <ng-container *ngIf="applicationType === 'Internship' || applicationType === 'Walkin'">
-             <div class="form-group">
-               <label for="fullName">Full Name (with initials) in CAPITAL LETTERS *</label>
-               <div class="input-wrapper">
-                 <input id="fullName" type="text" [(ngModel)]="fullName" name="fullName" required>
-               </div>
-             </div>
+          <!-- Section: Personal Details -->
+          <div class="form-section-header">
+            Personal Details
+          </div>
 
-             <div class="form-group">
-               <label for="college">College / University (full name) *</label>
-               <div class="input-wrapper">
-                 <input id="college" type="text" [(ngModel)]="college" name="college" required>
-               </div>
-             </div>
+          <!-- Full Name -->
+          <div class="form-group">
+            <label for="fullName">Full Name *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('fullName')">
+              <input id="fullName" type="text" [(ngModel)]="fullName" (keydown)="onNameKeyDown($event)"
+                (keypress)="onNameKeyPress($event)" (beforeinput)="onNameBeforeInput($event)"
+                (paste)="onNamePaste($event)" (input)="onFullNameInput($event)" (blur)="onFieldBlur('fullName')"
+                name="fullName" placeholder="Enter your full name" [readonly]="isCampusStudent" required>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('fullName')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('fullName') }}
+            </div>
+          </div>
 
-             <div class="form-group">
-               <label for="year">Year of Studying *</label>
-               <div class="input-wrapper">
-                 <select id="year" [(ngModel)]="year" name="year" required>
-                    <option value="" disabled>Select Year</option>
-                    <option *ngFor="let y of years" [value]="y">{{y}}</option>
-                 </select>
-               </div>
-             </div>
+          <!-- Phone with Country Code -->
+          <div class="form-group" *ngIf="!(isCampusStudent && phone.trim())">
+            <label for="phone">Phone Number (WhatsApp) *</label>
+            <div class="phone-input-group">
+              <div class="country-code-select-wrapper">
+                <select [(ngModel)]="countryCode" name="countryCode" class="country-code-select"
+                  [disabled]="isCampusStudent">
+                  <option *ngFor="let code of countryCodes" [value]="code">{{ code }}</option>
+                </select>
+              </div>
+              <div class="input-wrapper phone-number-input" [class.has-error]="hasError('phone')">
+                <input id="phone" type="tel" [(ngModel)]="phone" (blur)="onFieldBlur('phone')"
+                  (input)="onFieldInput('phone')" name="phone" maxlength="10" placeholder="10-digit number"
+                  [readonly]="isCampusStudent" required>
+              </div>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('phone')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('phone') }}
+            </div>
+          </div>
 
-             <div class="form-group">
-               <label for="department">Department (full form) *</label>
-               <div class="input-wrapper">
-                 <input id="department" type="text" [(ngModel)]="department" name="department" required>
-               </div>
-             </div>
+          <!-- Email -->
+          <div class="form-group" *ngIf="!(isCampusStudent && email.trim())">
+            <label for="email">Email Address *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('email')">
+              <input id="email" type="email" [(ngModel)]="email" (blur)="onFieldBlur('email')"
+                (input)="onFieldInput('email')" name="email" placeholder="name@example.com" [readonly]="isCampusStudent"
+                required>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('email')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('email') }}
+            </div>
+          </div>
 
-             <div class="form-group">
-               <label for="role">Internship role applied for *</label>
-               <div class="input-wrapper">
-                 <select id="role" [(ngModel)]="role" name="role" required>
-                    <option value="" disabled>Select Role</option>
-                    <option *ngFor="let r of roles" [value]="r">{{r}}</option>
-                 </select>
-               </div>
-             </div>
+          <!-- Date of Birth -->
+          <div class="form-group" *ngIf="!(isCampusStudent && dob.trim())">
+            <label for="dob">Date of Birth *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('dob')" style="position: relative; display: flex; align-items: center;">
+              <input id="dob" type="text" [(ngModel)]="dob" (input)="onDobInput($event)" (blur)="onFieldBlur('dob')"
+                name="dob" placeholder="DD/MM/YYYY" maxlength="10" required style="padding-right: 40px;">
+              <button type="button" (click)="hiddenDatePicker.showPicker()"
+                style="position: absolute; right: 10px; background: none; border: none; cursor: pointer; color: #64748b; font-size: 1rem; display: flex; align-items: center; justify-content: center;"
+                title="Select Date">
+                <i class="fa-regular fa-calendar"></i>
+              </button>
+              <input #hiddenDatePicker type="date" [min]="minDobDate" [max]="maxDobDate"
+                (change)="onDatePickerChange($event)"
+                style="position: absolute; right: 0; opacity: 0; width: 0; height: 0; pointer-events: none; border: none; padding: 0;">
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('dob')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('dob') }}
+            </div>
+          </div>
 
-             <div class="form-group" *ngIf="role === 'Other'">
-               <label for="otherRole">Specify Internship Role *</label>
-               <div class="input-wrapper">
-                 <input id="otherRole" type="text" [(ngModel)]="otherRole" name="otherRole" required>
-               </div>
-             </div>
+          <!-- Gender -->
+          <div class="form-group">
+            <label for="gender">Gender *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('gender')">
+              <select id="gender" [(ngModel)]="gender" (blur)="onFieldBlur('gender')" (change)="onFieldInput('gender')"
+                name="gender" required>
+                <option value="" disabled>Select Gender</option>
+                <option *ngFor="let g of genders" [value]="g">{{ g }}</option>
+              </select>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('gender')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('gender') }}
+            </div>
+          </div>
 
-             <div class="form-group">
-               <label for="email">Mail ID (official) *</label>
-               <div class="input-wrapper">
-                 <input id="email" type="email" [(ngModel)]="email" name="email" required>
-               </div>
-             </div>
+          <!-- Location -->
+          <div class="form-group">
+            <label for="location">Place, District *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('location')">
+              <input id="location" type="text" [(ngModel)]="location" (blur)="onFieldBlur('location')"
+                (input)="onFieldInput('location')" name="location" placeholder="e.g. Guindy, Chennai" required>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('location')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('location') }}
+            </div>
+          </div>
 
-             <div class="form-group">
-               <label for="phone">Contact Number (WhatsApp) *</label>
-               <div class="input-wrapper">
-                 <input id="phone" type="tel" [(ngModel)]="phone" name="phone" maxlength="10" required>
-               </div>
-             </div>
+          <!-- Marital Status (Hidden for Seasonal Internship and Campus Students) -->
+          <div class="form-group" *ngIf="applicationType !== 'Seasonal' && !isCampusStudent">
+            <label for="maritalStatus">Marital Status *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('maritalStatus')">
+              <select id="maritalStatus" [(ngModel)]="maritalStatus" (blur)="onFieldBlur('maritalStatus')"
+                (change)="onFieldInput('maritalStatus')" name="maritalStatus" required>
+                <option value="" disabled>Select Marital Status</option>
+                <option *ngFor="let m of maritalOptions" [value]="m">{{ m }}</option>
+              </select>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('maritalStatus')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('maritalStatus') }}
+            </div>
+          </div>
 
-             <div class="form-group">
-               <label for="emergencyContact">Emergency Contact (Parent / Guardian) *</label>
-               <div class="input-wrapper">
-                 <input id="emergencyContact" type="tel" [(ngModel)]="emergencyContact" name="emergencyContact" maxlength="10" required>
-               </div>
-             </div>
+          <!-- Role Applied For -->
+          <div class="form-group">
+            <label for="role">Role Applied For *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('role')">
+              <select id="role" [(ngModel)]="role" (blur)="onFieldBlur('role')" (change)="onRoleChange()" name="role"
+                [disabled]="(!isCampusStudent && applicationType !== 'Seasonal' && applicationType !== 'Walkin') || (isCampusStudent && roles.length <= 1)" required>
+                <option value="" disabled>Select Role</option>
+                <option *ngFor="let r of roles" [value]="r">{{r}}</option>
+              </select>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('role')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('role') }}
+            </div>
+          </div>
 
-             <div class="form-group">
-               <label for="linkedin">LinkedIn Profile (URL) *</label>
-               <div class="input-wrapper">
-                 <input id="linkedin" type="url" [(ngModel)]="linkedin" name="linkedin" required>
-               </div>
-             </div>
+          <div class="form-group" *ngIf="role === 'Other'">
+            <label for="otherRole">Specify Role Name *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('otherRole')">
+              <input id="otherRole" type="text" [(ngModel)]="otherRole" (blur)="onFieldBlur('otherRole')"
+                (input)="onFieldInput('otherRole')" name="otherRole" required>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('otherRole')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('otherRole') }}
+            </div>
+          </div>
 
-             <div class="form-group">
-               <label>Resume / CV (PDF, Max 2MB) *</label>
-               <div class="file-upload-wrapper">
-                 <input type="file" id="resume" (change)="onFileChange($event)" accept="application/pdf">
-                 <label for="resume" class="file-upload-btn">
-                    <i class="fa-solid fa-upload"></i> {{ resumeFileName || 'Click to upload PDF' }}
-                 </label>
-               </div>
-             </div>
+          <!-- Section: Education & Documents -->
+          <div class="form-section-header">
+            <i class="fa-solid fa-graduation-cap"></i> Education & Profile
+          </div>
 
-             <div class="form-group project-links-group">
-               <label>Project Links <span class="optional-label">(optional, max 5)</span></label>
-               <div *ngFor="let link of projectLinks; let i = index; trackBy: trackByIndex" class="project-link-row">
-                  <div class="input-wrapper">
-                    <input type="url" [(ngModel)]="projectLinks[i]" name="projectLink{{i}}">
-                  </div>
-                  <button type="button" class="remove-btn" (click)="removeProjectLink(i)" *ngIf="projectLinks.length > 1">
-                     <i class="fa-solid fa-trash"></i>
-                  </button>
-               </div>
-               <button type="button" class="add-link-btn" (click)="addProjectLink()" *ngIf="projectLinks.length < 5">
-                  + Add project
-               </button>
-             </div>
-           </ng-container>
+          <!-- Degree & College -->
+          <div class="form-group" *ngIf="!(isCampusStudent && degree.trim())">
+            <label for="degree">Highest Degree / Qualification *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('degree')">
+              <input id="degree" type="text" [(ngModel)]="degree" (blur)="onFieldBlur('degree')"
+                (input)="onFieldInput('degree')" name="degree"
+                placeholder="e.g. B.E Computer Science, B.Tech, B.Sc, MBA, etc." [readonly]="isCampusStudent" required>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('degree')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('degree') }}
+            </div>
+          </div>
 
-           <!-- ===== EMPLOYEE FORM (matches employee_formone.dart) ===== -->
-           <ng-container *ngIf="applicationType === 'Employee'">
-             <!-- Personal Details Section -->
-             <div class="form-section-header">
-               <i class="fa-solid fa-user"></i> Personal Details
-             </div>
+          <div class="form-group" *ngIf="!(isCampusStudent && department.trim())">
+            <label for="department">Department / Specialization *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('department')">
+              <input id="department" type="text" [(ngModel)]="department" (blur)="onFieldBlur('department')"
+                (input)="onFieldInput('department')" name="department"
+                placeholder="e.g. Computer Science & Engineering, Mechanical, etc." [readonly]="isCampusStudent"
+                required>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('department')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('department') }}
+            </div>
+          </div>
 
-             <div class="form-group">
-               <label for="fullName">Full Name (As per Aadhaar/PAN) *</label>
-               <div class="input-wrapper">
-                 <input id="fullName" type="text" [(ngModel)]="fullName" name="fullName" required>
-               </div>
-             </div>
+          <div class="form-group" *ngIf="!(isCampusStudent && college.trim())">
+            <label for="college">College / University Name *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('college')">
+              <input id="college" type="text" [(ngModel)]="college" (blur)="onFieldBlur('college')"
+                (input)="onFieldInput('college')" name="college" placeholder="Full name of your institution"
+                [readonly]="isCampusStudent" required>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('college')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('college') }}
+            </div>
+          </div>
 
-             <div class="form-group">
-               <label for="email">Email Address *</label>
-               <div class="input-wrapper">
-                 <input id="email" type="email" [(ngModel)]="email" name="email" required>
-               </div>
-             </div>
-
-             <div class="form-group">
-               <label for="phone">Phone Number (WhatsApp) *</label>
-               <div class="input-wrapper">
-                 <input id="phone" type="tel" [(ngModel)]="phone" name="phone" maxlength="10" required>
-               </div>
-             </div>
-
-             <div class="form-group">
-               <label for="emergencyName">Emergency Contact Name *</label>
-               <div class="input-wrapper">
-                 <input id="emergencyName" type="text" [(ngModel)]="emergencyName" name="emergencyName" required>
-               </div>
-             </div>
-
-             <div class="form-group">
-               <label for="emergencyContact">Emergency Contact Number *</label>
-               <div class="input-wrapper">
-                 <input id="emergencyContact" type="tel" [(ngModel)]="emergencyContact" name="emergencyContact" maxlength="10" required>
-               </div>
-             </div>
-
-             <div class="form-group">
-               <label for="dob">Date of Birth *</label>
-               <div class="input-wrapper">
-                 <input id="dob" type="date" [(ngModel)]="dob" name="dob" required>
-               </div>
-             </div>
-
-             <div class="form-group">
-               <label for="address">Residential Address *</label>
-               <div class="input-wrapper">
-                 <textarea id="address" [(ngModel)]="address" name="address" rows="3" required></textarea>
-               </div>
-             </div>
-
-             <div class="form-group">
-               <label for="role">Role applying for *</label>
-               <div class="input-wrapper">
-                 <select id="role" [(ngModel)]="role" name="role" required>
-                    <option value="" disabled>Select Role</option>
-                    <option *ngFor="let r of roles" [value]="r">{{r}}</option>
-                 </select>
-               </div>
-             </div>
-
-             <div class="form-group" *ngIf="role === 'Other'">
-               <label for="otherRole">Specify Role *</label>
-               <div class="input-wrapper">
-                 <input id="otherRole" type="text" [(ngModel)]="otherRole" name="otherRole" required>
-               </div>
-             </div>
-
-             <div class="form-group">
-               <label for="linkedin">LinkedIn Profile URL *</label>
-               <div class="input-wrapper">
-                 <input id="linkedin" type="url" [(ngModel)]="linkedin" name="linkedin" required>
-               </div>
-             </div>
-
-             <div class="form-group">
-               <label for="gender">Gender *</label>
-               <div class="input-wrapper">
-                 <select id="gender" [(ngModel)]="gender" name="gender" required>
-                    <option value="" disabled>Select Gender</option>
-                    <option *ngFor="let g of genders" [value]="g">{{g}}</option>
-                 </select>
-               </div>
-             </div>
-
-             <div class="form-group">
-               <label for="nationality">Nationality *</label>
-               <div class="input-wrapper">
-                 <input id="nationality" type="text" [(ngModel)]="nationality" name="nationality" required>
-               </div>
-             </div>
-
-             <div class="form-group">
-               <label for="maritalStatus">Marital Status *</label>
-               <div class="input-wrapper">
-                 <select id="maritalStatus" [(ngModel)]="maritalStatus" name="maritalStatus" required>
-                    <option value="" disabled>Select Status</option>
-                    <option *ngFor="let s of maritalOptions" [value]="s">{{s}}</option>
-                 </select>
-               </div>
-             </div>
-
-             <!-- Project Links Section -->
-             <div class="form-section-header">
-               <i class="fa-solid fa-link"></i> Project Links
-             </div>
-             <div class="form-group project-links-group">
-               <p class="optional-hint">Add up to 5 project links (GitHub, portfolio, etc.) — optional</p>
-               <div *ngFor="let link of projectLinks; let i = index; trackBy: trackByIndex" class="project-link-row">
-                  <div class="input-wrapper">
-                    <input type="url" [(ngModel)]="projectLinks[i]" name="projectLink{{i}}">
-                  </div>
-                  <button type="button" class="remove-btn" (click)="removeProjectLink(i)" *ngIf="projectLinks.length > 1">
-                     <i class="fa-solid fa-trash"></i>
-                  </button>
-               </div>
-               <button type="button" class="add-link-btn" (click)="addProjectLink()" *ngIf="projectLinks.length < 5">
-                  + Add another project
-               </button>
-             </div>
-           </ng-container>
-
-           <!-- ===== DECLARATIONS (both types) ===== -->
-           <div class="declarations-section">
-              <label class="checkbox-label">
-                 <input type="checkbox" [(ngModel)]="declareAccuracy" name="declareAccuracy">
-                 I declare that all information provided is accurate.
-              </label>
-              <label class="checkbox-label">
-                 <input type="checkbox" [(ngModel)]="bgConsent" name="bgConsent">
-                 I consent to background verification.
-              </label>
-              <label class="checkbox-label checkbox-label-last">
-                 <input type="checkbox" [(ngModel)]="whatsappConsent" name="whatsappConsent">
-                 I agree to receive communications via WhatsApp and Email.
+          <!-- Resume Upload (< 1MB) - Hidden for Seasonal Internship -->
+          <div class="form-group" *ngIf="applicationType !== 'Seasonal'">
+            <label>Resume / CV*</label>
+            <div class="file-upload-wrapper" [class.has-error]="hasError('resume')">
+              <input type="file" id="resume" (change)="onFileChange($event)"
+                accept="application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+              <label for="resume" class="file-upload-btn" [class.has-file]="!!resumeFileName">
+                <i class="fa-solid fa-upload"></i> {{ resumeFileName || 'Upload Resume (Max 1MB)' }}
               </label>
             </div>
-
-            <div class="step-actions">
-               <button type="button" class="btn btn-secondary" (click)="prevStep()">Back</button>
-               <button type="button" class="submit-btn step-next-btn" (click)="openDeclaration()" [disabled]="!registerForm.form.valid || ( (applicationType === 'Internship' || applicationType === 'Walkin') && !resumeBase64)">
-                  Submit Application
-               </button>
+            <div class="field-error-msg" *ngIf="hasError('resume')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('resume') }}
             </div>
+          </div>
+
+          <!-- LinkedIn URL -->
+          <div class="form-group">
+            <label for="linkedin">LinkedIn Profile URL *</label>
+            <div class="input-wrapper" [class.has-error]="hasError('linkedin')">
+              <input id="linkedin" type="url" [(ngModel)]="linkedin" (blur)="onFieldBlur('linkedin')"
+                (input)="onFieldInput('linkedin')" name="linkedin" placeholder="https://linkedin.com/in/yourprofile"
+                required>
+            </div>
+            <div class="field-error-msg" *ngIf="hasError('linkedin')">
+              <i class="fa-solid fa-circle-exclamation"></i> {{ getError('linkedin') }}
+            </div>
+          </div>
+
+          <!-- ======================================== -->
+          <!-- PROJECT LINKS (CAMPUS DRIVE CANDIDATES)  -->
+          <!-- ======================================== -->
+          <ng-container *ngIf="isCampusStudent && isTechnicalRole()">
+            <div class="form-section-header">
+              <i class="fa-solid fa-link"></i> Project Links
+            </div>
+
+            <div class="form-group">
+              <label>Project Links (Live Deployed URLs) *</label>
+              <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; font-size: 0.8rem; color: #475569; display: flex; align-items: flex-start; gap: 8px; line-height: 1.4;">
+                <i class="fa-solid fa-circle-info" style="color: #64748b; margin-top: 2px; font-size: 0.85rem;"></i>
+                <span>Provide live deployed project URLs (e.g. Vercel, Netlify, Render, Portfolio). Git repository links (GitHub/GitLab) are not accepted.</span>
+              </div>
+
+              <div *ngFor="let link of campusProjectLinks; let idx = index; trackBy: trackByIndex" style="display: flex; gap: 8px; margin-bottom: 10px; align-items: center;">
+                <div class="input-wrapper" style="flex: 1;" [class.has-error]="hasError('campusProjectLinks')">
+                  <input type="url" [(ngModel)]="campusProjectLinks[idx]" (input)="onProjectLinkInput(idx)"
+                    name="campusProjectLink_{{idx}}" placeholder="https://project-{{idx + 1}}.vercel.app" required>
+                </div>
+                <button type="button" class="btn btn-secondary" style="padding: 8px 12px; color: #dc2626; border-color: #fecaca;"
+                  *ngIf="campusProjectLinks.length > 1" (click)="removeCampusProjectLink(idx)" title="Remove Link">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+
+              <div class="field-error-msg" *ngIf="hasError('campusProjectLinks')">
+                <i class="fa-solid fa-circle-exclamation"></i> {{ getError('campusProjectLinks') }}
+              </div>
+
+              <button type="button" class="btn btn-secondary" *ngIf="campusProjectLinks.length < 5"
+                (click)="addCampusProjectLink()" style="margin-top: 4px; font-size: 0.82rem;">
+                <i class="fa-solid fa-plus"></i> Add Another Project
+              </button>
+            </div>
+          </ng-container>
+
+          <!-- ======================================== -->
+          <!-- EXPERIENCE PROFILE (EMPLOYEES ONLY)      -->
+          <!-- ======================================== -->
+          <ng-container *ngIf="applicationType === 'Employee' && !isCampusStudent">
+            <div class="form-section-header">
+              <i class="fa-solid fa-briefcase"></i> Experience Profile
+            </div>
+
+            <!-- Candidate Experience Status Dropdown -->
+            <div class="form-group">
+              <label for="experienceStatus">Candidate Experience Status *</label>
+              <div class="input-wrapper">
+                <select id="experienceStatus" [(ngModel)]="experienceStatus"
+                  (ngModelChange)="onExperienceStatusChange()" name="experienceStatus" required>
+                  <option value="fresher">Fresher (Recent Graduate)</option>
+                  <option value="experienced">Experienced Professional</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Fresher Fields -->
+            <ng-container *ngIf="isFresher">
+              <div class="form-row-2col">
+                <div class="form-group">
+                  <label for="gradYear">Graduation Year *</label>
+                  <div class="input-wrapper" [class.has-error]="hasError('graduationYear')">
+                    <input id="gradYear" type="number" [(ngModel)]="graduationYear"
+                      (blur)="onFieldBlur('graduationYear')" (input)="onFieldInput('graduationYear')"
+                      name="graduationYear" placeholder="e.g. 2024" min="2015" max="2030" required>
+                  </div>
+                  <div class="field-error-msg" *ngIf="hasError('graduationYear')">
+                    <i class="fa-solid fa-circle-exclamation"></i> {{ getError('graduationYear') }}
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="cgpa">Percentage / CGPA</label>
+                  <div class="input-wrapper">
+                    <input id="cgpa" type="text" [(ngModel)]="cgpaOrPercentage" name="cgpaOrPercentage"
+                      placeholder="e.g. 8.5 CGPA or 85%" [readonly]="isCampusStudent">
+                  </div>
+                </div>
+              </div>
+            </ng-container>
+
+            <!-- Experienced Fields (Minimal, Professional & Standard) -->
+            <ng-container *ngIf="!isFresher">
+              <div class="form-row-2col">
+                <div class="form-group">
+                  <label for="curCompany">Current / Previous Company *</label>
+                  <div class="input-wrapper" [class.has-error]="hasError('currentCompany')">
+                    <input id="curCompany" type="text" [(ngModel)]="currentCompany"
+                      (blur)="onFieldBlur('currentCompany')" (input)="onFieldInput('currentCompany')"
+                      name="currentCompany" placeholder="e.g. Infosys, TCS, Freelance" required>
+                  </div>
+                  <div class="field-error-msg" *ngIf="hasError('currentCompany')">
+                    <i class="fa-solid fa-circle-exclamation"></i> {{ getError('currentCompany') }}
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="curDesig">Current / Last Designation *</label>
+                  <div class="input-wrapper" [class.has-error]="hasError('currentDesignation')">
+                    <input id="curDesig" type="text" [(ngModel)]="currentDesignation"
+                      (blur)="onFieldBlur('currentDesignation')" (input)="onFieldInput('currentDesignation')"
+                      name="currentDesignation" placeholder="e.g. Software Engineer" required>
+                  </div>
+                  <div class="field-error-msg" *ngIf="hasError('currentDesignation')">
+                    <i class="fa-solid fa-circle-exclamation"></i> {{ getError('currentDesignation') }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-row-2col">
+                <div class="form-group">
+                  <label for="yearsExp">Total Experience (Years) *</label>
+                  <div class="input-wrapper" [class.has-error]="hasError('yearsOfExperience')">
+                    <input id="yearsExp" type="number" step="0.5" min="0" max="40" [(ngModel)]="yearsOfExperience"
+                      (blur)="onFieldBlur('yearsOfExperience')" (input)="onFieldInput('yearsOfExperience')"
+                      name="yearsOfExperience" placeholder="e.g. 2.5" required>
+                  </div>
+                  <div class="field-error-msg" *ngIf="hasError('yearsOfExperience')">
+                    <i class="fa-solid fa-circle-exclamation"></i> {{ getError('yearsOfExperience') }}
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="noticePeriod">Notice Period (Days) *</label>
+                  <div class="input-wrapper" [class.has-error]="hasError('noticePeriodDays')">
+                    <input id="noticePeriod" type="number" step="1" min="0" max="180" [(ngModel)]="noticePeriodDays"
+                      (blur)="onFieldBlur('noticePeriodDays')" (input)="onFieldInput('noticePeriodDays')"
+                      name="noticePeriodDays" placeholder="e.g. 30 (0 for Immediate)" required>
+                  </div>
+                  <div class="field-error-msg" *ngIf="hasError('noticePeriodDays')">
+                    <i class="fa-solid fa-circle-exclamation"></i> {{ getError('noticePeriodDays') }}
+                  </div>
+                </div>
+              </div>
+
+              <div class="form-row-2col">
+                <div class="form-group">
+                  <label for="curCtc">Current CTC (₹ LPA) *</label>
+                  <div class="input-wrapper" [class.has-error]="hasError('currentCtc')">
+                    <input id="curCtc" type="number" step="0.1" min="0" [(ngModel)]="currentCtc"
+                      (blur)="onFieldBlur('currentCtc')" (input)="onFieldInput('currentCtc')" name="currentCtc"
+                      placeholder="e.g. 4.5" required>
+                  </div>
+                  <div class="field-error-msg" *ngIf="hasError('currentCtc')">
+                    <i class="fa-solid fa-circle-exclamation"></i> {{ getError('currentCtc') }}
+                  </div>
+                </div>
+
+                <div class="form-group">
+                  <label for="expCtc">Expected CTC (₹ LPA) *</label>
+                  <div class="input-wrapper" [class.has-error]="hasError('expectedCtc')">
+                    <input id="expCtc" type="number" step="0.1" min="0" [(ngModel)]="expectedCtc"
+                      (blur)="onFieldBlur('expectedCtc')" (input)="onFieldInput('expectedCtc')" name="expectedCtc"
+                      placeholder="e.g. 6.5" required>
+                  </div>
+                  <div class="field-error-msg" *ngIf="hasError('expectedCtc')">
+                    <i class="fa-solid fa-circle-exclamation"></i> {{ getError('expectedCtc') }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- Available to Join Date -->
+              <div class="form-group">
+                <label for="joinDate">When are you available to join?</label>
+                <div class="input-wrapper">
+                  <input id="joinDate" type="date" [(ngModel)]="availableJoiningDate" name="availableJoiningDate">
+                </div>
+              </div>
+            </ng-container>
+          </ng-container>
+
+          <div class="step-actions">
+            <button type="button" class="btn btn-secondary" (click)="prevStep()">Back</button>
+            <button type="button" class="submit-btn step-next-btn" (click)="nextStep()">
+              {{ hasAssessment ? 'Next' : 'Submit' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- ========================================== -->
+        <!-- STEP 4: ROLE-SPECIFIC ASSESSMENT STAGE     -->
+        <!-- ========================================== -->
+        <div *ngIf="currentStep === 4 && hasAssessment" class="form-scrollable-area">
+
+          <div class="form-section-header">
+            <i class="fa-solid fa-clipboard-check"></i> {{ dynamicAssessment?.title || (targetRole || role) + ' PreSight' }}
+          </div>
+          <p class="assessment-intro-desc" *ngIf="dynamicAssessment?.description"
+            style="font-size: 0.85rem; color: #64748b; margin-top: -0.5rem; margin-bottom: 1.25rem;">
+            {{ dynamicAssessment.description }}
+          </p>
+
+          <!-- Dynamic Questions List -->
+          <div *ngIf="dynamicAssessment?.questions?.length > 0">
+            <div class="form-group" *ngFor="let q of dynamicAssessment.questions; let qIdx = index">
+              <label>{{ q.label }} <span class="req" *ngIf="q.required">*</span></label>
+
+              <!-- Type 1: Multi-Select Tags -->
+              <div *ngIf="q.type === 'multiselect'" class="tag-select-container">
+                <div class="input-wrapper">
+                  <select (change)="addDynamicTag(q.id, $event)">
+                    <option value="" disabled selected>-- {{ q.placeholder || 'Select options' }} --</option>
+                    <option *ngFor="let opt of q.options" [value]="opt"
+                      [disabled]="(dynamicTags[q.id] || []).includes(opt)">
+                      {{ opt }} {{ (dynamicTags[q.id] || []).includes(opt) ? '✓' : '' }}
+                    </option>
+                  </select>
+                </div>
+
+                <div class="tags-display-wrap" *ngIf="(dynamicTags[q.id] || []).length > 0">
+                  <div class="tag-item-borderless" *ngFor="let opt of dynamicTags[q.id]">
+                    <span class="tag-label">{{ opt }}</span>
+                    <button type="button" class="tag-remove-icon" (click)="removeDynamicTag(q.id, opt)"
+                      title="Remove {{ opt }}">
+                      <i class="fa-solid fa-xmark"></i>
+                    </button>
+                    <span class="tag-pipe">|</span>
+                  </div>
+                </div>
+
+                <!-- Conditional "Other" text input -->
+                <div class="input-wrapper" *ngIf="(dynamicTags[q.id] || []).includes('Other')" style="margin-top: 8px;">
+                  <input type="text" [(ngModel)]="dynamicOtherText[q.id]" [name]="'other_' + q.id"
+                    placeholder="Please specify other details..." [required]="q.required">
+                </div>
+              </div>
+
+              <!-- Type 2: Single Select Dropdown -->
+              <div *ngIf="q.type === 'dropdown'" class="input-wrapper">
+                <select [(ngModel)]="dynamicAnswers[q.id]" [name]="'q_' + q.id" [required]="q.required">
+                  <option value="" disabled selected>-- Select an option --</option>
+                  <option *ngFor="let opt of q.options" [value]="opt">{{ opt }}</option>
+                </select>
+              </div>
+
+              <!-- Type 3: Short Text -->
+              <div *ngIf="q.type === 'text'" class="input-wrapper">
+                <input type="text" [(ngModel)]="dynamicAnswers[q.id]" [name]="'q_' + q.id"
+                  [placeholder]="q.placeholder || 'Enter your response...'" [required]="q.required">
+              </div>
+
+              <!-- Type 4: Textarea / Paragraph -->
+              <div *ngIf="q.type === 'textarea'" class="input-wrapper">
+                <textarea rows="3" [(ngModel)]="dynamicAnswers[q.id]" [name]="'q_' + q.id"
+                  [placeholder]="q.placeholder || 'Write your response here...'" [required]="q.required"
+                  style="width: 100%; padding: 0.75rem; border: 1px solid var(--border-color, #cbd5e1); border-radius: 8px; font-family: inherit; font-size: 0.9rem; resize: vertical;"></textarea>
+              </div>
+
+              <!-- Type 5: Proficiency Rating -->
+              <div *ngIf="q.type === 'rating'" class="input-wrapper">
+                <select [(ngModel)]="dynamicAnswers[q.id]" [name]="'q_' + q.id" [required]="q.required">
+                  <option value="" disabled selected>-- Select proficiency rating --</option>
+                  <option
+                    *ngFor="let opt of (q.options?.length > 0 ? q.options : ['Beginner', 'Basic', 'Good', 'Very Good', 'Expert'])"
+                    [value]="opt">{{ opt }}</option>
+                </select>
+              </div>
+
+              <!-- Type 6: Project / Portfolio Links -->
+              <div *ngIf="q.type === 'links'">
+                <div class="project-links-header">
+                  <span style="font-size: 0.8rem; color: #64748b;">Live deployed URLs (No GitHub / GitLab links)</span>
+                  <button type="button" class="add-link-btn"
+                    *ngIf="(dynamicLinks[q.id] || []).length < (q.maxLinks || 5)" (click)="addDynamicLink(q.id)">
+                    <i class="fa-solid fa-plus"></i> Add Link
+                  </button>
+                </div>
+                <div class="project-link-row"
+                  *ngFor="let link of dynamicLinks[q.id]; let lIdx = index; trackBy: trackByIndex">
+                  <div class="input-wrapper project-link-input-wrapper">
+                    <input type="url" [(ngModel)]="dynamicLinks[q.id][lIdx]" [name]="'link_' + q.id + '_' + lIdx"
+                      [placeholder]="'https://project-' + (lIdx + 1) + '.vercel.app'"
+                      [required]="q.required && lIdx === 0">
+                  </div>
+                  <button type="button" class="remove-link-btn" *ngIf="dynamicLinks[q.id].length > (q.minLinks || 1)"
+                    (click)="removeDynamicLink(q.id, lIdx)" title="Remove Link">
+                    <i class="fa-solid fa-trash-can"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="step-actions">
+            <button type="button" class="btn btn-secondary" (click)="prevStep()">Back</button>
+            <button type="button" class="submit-btn step-next-btn" (click)="nextStep()">
+              Submit
+            </button>
+          </div>
         </div>
 
         <div class="form-footer">
@@ -422,26 +802,56 @@
 
   <!-- Declaration Modal -->
   <div class="modal-overlay" *ngIf="showDeclarationModal">
-     <div class="modal-content">
-        <div class="modal-header">
-           <h3><i class="fa-solid fa-info-circle"></i> Declaration</h3>
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3><i class="fa-solid fa-info-circle"></i> Application Confirmation</h3>
+      </div>
+      <div class="modal-body">
+        <div class="error-banner modal-error-banner" *ngIf="errorMessage()"
+          style="margin-bottom: 1.25rem; font-size: 0.88rem; padding: 0.75rem 1rem; border-radius: 8px;">
+          <i class="fa-solid fa-circle-exclamation"></i>
+          <span>{{ errorMessage() }}</span>
         </div>
-        <div class="modal-body">
-           <p>Please read the instructions carefully before submitting your application.</p>
-           <p><strong>Important:</strong></p>
-           <ul>
-              <li>Further communication will be sent to your official email.</li>
-              <li>After approval you will receive your ID.</li>
-              <li>Use that ID to log in and set your password on first login.</li>
-           </ul>
+
+        <p>You are submitting your application for <strong>{{ targetRole || role }}</strong> at <strong>{{
+            verifiedCompanyName() || 'Softrate Technologies Private Limited – India' }}</strong>.</p>
+        <p><strong>Next Steps:</strong></p>
+        <ul>
+          <li>Our HR & Technical teams will review your portfolio and details.</li>
+          <li>Upon shortlisting, interview details will be sent directly to your email.</li>
+        </ul>
+
+        <!-- Consent Declarations -->
+        <div class="modal-declarations-section"
+          style="margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #e2e8f0; display: flex; flex-direction: column; gap: 10px;">
+          <label class="checkbox-label"
+            style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.84rem; color: #334155; cursor: pointer; line-height: 1.4;">
+            <input type="checkbox" [(ngModel)]="declareAccuracy" name="declareAccuracy" style="margin-top: 2px;">
+            <span>I declare that all information provided is accurate and authentic.</span>
+          </label>
+          <label class="checkbox-label"
+            style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.84rem; color: #334155; cursor: pointer; line-height: 1.4;">
+            <input type="checkbox" [(ngModel)]="bgConsent" name="bgConsent" style="margin-top: 2px;">
+            <span>I consent to background verification by {{ verifiedCompanyName() || 'Softrate Global' }}.</span>
+          </label>
+          <label class="checkbox-label"
+            style="display: flex; align-items: flex-start; gap: 8px; font-size: 0.84rem; color: #334155; cursor: pointer; line-height: 1.4;">
+            <input type="checkbox" [(ngModel)]="whatsappConsent" name="whatsappConsent" style="margin-top: 2px;">
+            <span>I agree to receive communications via WhatsApp and Email.</span>
+          </label>
         </div>
-        <div class="modal-footer">
-           <button class="btn btn-secondary" (click)="closeDeclaration()">Cancel</button>
-           <button class="btn btn-primary" (click)="submitForm()" [disabled]="isLoading()">
-              <span *ngIf="!isLoading()">Submit Application</span>
-              <div class="spinner" *ngIf="isLoading()"></div>
-           </button>
-        </div>
-     </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-secondary" (click)="closeDeclaration()" [disabled]="isLoading()">Review Details</button>
+        <button class="btn btn-primary" (click)="submitForm()"
+          [disabled]="isLoading() || !declareAccuracy || !bgConsent || !whatsappConsent">
+          <span *ngIf="!isLoading()">Confirm & Submit</span>
+          <ng-container *ngIf="isLoading()">
+            <div class="spinner"></div>
+            <span>Submitting...</span>
+          </ng-container>
+        </button>
+      </div>
+    </div>
   </div>
 </div>

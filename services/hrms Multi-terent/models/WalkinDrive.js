@@ -1,6 +1,15 @@
 const mongoose = require('mongoose');
 
 const WalkinDriveSchema = new mongoose.Schema({
+  driveType: {
+    type: String,
+    enum: ['walkin', 'seasonal'],
+    default: 'walkin'
+  },
+  title: {
+    type: String,
+    default: ''
+  },
   startDate: {
     type: Date,
     required: true
@@ -19,11 +28,11 @@ const WalkinDriveSchema = new mongoose.Schema({
   },
   jdPdfUrl: {
     type: String,
-    required: true
+    default: ''
   },
   whatsappGroupLink: {
     type: String,
-    required: true
+    default: ''
   },
   companyId: {
     type: mongoose.Schema.Types.ObjectId,

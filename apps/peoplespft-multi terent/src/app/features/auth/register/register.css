@@ -2,41 +2,42 @@
   min-height: 100vh;
   display: flex;
   font-family: var(--font-body);
-  background-color: var(--bg-secondary, #fff);
+  background-color: #F7F6F2;
 }
 
 /* Left Branding Panel */
 .branding-panel {
-  flex: 1.2;
-  background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);
+  flex: 1.15;
+  background-color: #183D36;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  padding: 4rem 6rem;
+  justify-content: space-between;
+  padding: 4.5rem 5.5rem;
   position: relative;
   overflow: hidden;
   color: #fff;
 }
 
-.branding-content {
+.branding-header {
   position: relative;
   z-index: 2;
 }
 
-.branding-bg-circles {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-  overflow: hidden;
+.branding-footer-content {
+  position: relative;
+  z-index: 2;
+  max-width: 500px;
+  margin-bottom: 2rem;
 }
 
-.circle {
+.constellation-svg {
   position: absolute;
-  border-radius: 50%;
-  background: rgba(255, 255, 255, 0.1);
+  right: 1.5rem;
+  bottom: 1.5rem;
+  width: 320px;
+  height: 320px;
+  pointer-events: none;
+  z-index: 1;
 }
 
 .circle-1 {
@@ -54,57 +55,63 @@
 }
 
 .logo-container {
-  margin-bottom: 3rem;
   display: flex;
   align-items: center;
   gap: 0.85rem;
+  margin-bottom: 0.5rem;
+  background: transparent !important;
 }
 
 .brand-logo-img {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   object-fit: contain;
-  background-color: var(--bg-secondary, #fff);
-  border-radius: var(--hc-radius, 10px);
-  padding: 5px;
-  border: 1px solid var(--border-color, #e5e7eb);
+  background: transparent !important;
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  border-radius: 0 !important;
 }
 
 .logo-text {
-  font-family: var(--font-heading);
-  font-size: var(--text-5xl);
-  font-weight: var(--font-weight-extrabold);
-  color: #ffffff;
-  letter-spacing: -1px;
-  display: flex;
-  align-items: center;
+  font-family: var(--font-heading, inherit);
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: #FFFFFF;
+  letter-spacing: -0.5px;
 }
 
 .crm-tag {
-  font-size: var(--text-sm);
-  font-weight: var(--font-weight-bold);
-  color: rgba(255, 255, 255, 0.7);
-  text-transform: uppercase;
-  letter-spacing: 1.5px;
-  margin-bottom: 1rem;
-  display: block;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  letter-spacing: 0.5px;
+  margin-left: 2px;
 }
 
-.branding-panel h1 {
-  font-family: var(--font-heading);
-  font-size: var(--text-6xl);
-  line-height: 1.1;
-  font-weight: var(--font-weight-bold);
-  color: #ffffff;
+.branding-footer-content {
+  position: relative;
+  z-index: 2;
   max-width: 500px;
-  margin: 0 0 1.5rem 0;
+  margin-bottom: 2rem;
+}
+
+.branding-footer-content h1 {
+  font-family: var(--font-heading, inherit);
+  font-size: 2.75rem;
+  line-height: 1.15;
+  font-weight: 700;
+  color: #FFFFFF;
+  letter-spacing: -0.75px;
+  margin: 0 0 1.25rem 0;
 }
 
 .branding-desc {
-  font-size: var(--text-xl);
-  color: rgba(255, 255, 255, 0.8);
-  max-width: 400px;
-  line-height: 1.6;
+  font-size: 1.05rem;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.55;
+  margin: 0;
 }
 
 /* Right Form Panel */
@@ -114,7 +121,7 @@
   flex-direction: column;
   justify-content: center;
   padding: 4rem 6rem;
-  background-color: var(--bg-secondary, #fff);
+  background-color: #F7F6F2;
 }
 
 .login-card {
@@ -183,9 +190,9 @@
 
 .input-wrapper input:focus {
   outline: none;
-  border-color: #3b82f6;
+  border-color: #183D36;
   background-color: var(--bg-secondary, #fff);
-  box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.1);
+  box-shadow: 0 0 0 4px rgba(24, 61, 54, 0.1);
 }
 
 .input-wrapper > i {
@@ -199,12 +206,12 @@
 }
 
 .input-wrapper input:focus + i {
-  color: #3b82f6;
+  color: #183D36;
 }
 
 .submit-btn {
   width: 100%;
-  background-color: #3b82f6;
+  background-color: #183D36;
   color: #fff;
   border: none;
   padding: 1rem;
@@ -220,7 +227,7 @@
 }
 
 .submit-btn:hover:not(:disabled) {
-  background-color: #2563eb;
+  background-color: #122E29;
 }
 
 .submit-btn:disabled {
@@ -238,7 +245,7 @@
 
 .form-footer a {
   font-size: var(--text-lg);
-  color: #3b82f6;
+  color: #183D36;
   text-decoration: none;
   font-weight: var(--font-weight-medium);
 }

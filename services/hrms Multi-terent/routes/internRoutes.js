@@ -50,10 +50,20 @@ router.post("/add", verifyPublicTenant, async (req, res) => {
       resume, // Base64 PDF
       projectLinks: projectLinksRaw,
       webAccess,
-      remoteAccess
+      remoteAccess,
+      degree,
+      qualification,
+      location,
+      gender,
+      maritalStatus,
+      dob,
+      countryCode,
+      jobId,
+      applicationType,
+      assessmentAnswers: assessmentAnswersRaw
     } = req.body;
 
-    // Parse projectLinks (sent as JSON string from Flutter)
+    // Parse projectLinks (sent as JSON string from Flutter/Web)
     let projectLinks = [];
     try {
       if (projectLinksRaw) {
@@ -63,6 +73,59 @@ router.post("/add", verifyPublicTenant, async (req, res) => {
         }
       }
     } catch (_) { projectLinks = []; }
+
+    // Parse assessmentAnswers
+    let assessmentAnswers = {};
+    try {
+      if (assessmentAnswersRaw) {
+        assessmentAnswers = typeof assessmentAnswersRaw === 'string'
+          ? JSON.parse(assessmentAnswersRaw)
+          : assessmentAnswersRaw;
+      }
+    } catch (_) { assessmentAnswers = {}; }
+
+    // Check Campus Drive Timeline Expiration & Duplicate Submission: Do not allow form submission once timeline ends or already submitted
+    if (req.body.campusStudentId) {
+      const CampusStudentModel = req.models && req.models.CampusStudent ? req.models.CampusStudent : require('../models/CampusStudent');
+      const CampusDriveModel = req.models && req.models.CampusDrive ? req.models.CampusDrive : require('../models/CampusDrive');
+      const student = await CampusStudentModel.findById(req.body.campusStudentId).select('driveId isOnboarded isFormSubmitted');
+      if (student) {
+        if (student.isFormSubmitted || student.isOnboarded) {
+          return res.status(400).json({
+            success: false,
+            code: 'ALREADY_SUBMITTED',
+            message: 'You have already submitted your application for this campus drive. Multiple submissions are not allowed.'
+          });
+        }
+        if (student.driveId) {
+        const drive = await CampusDriveModel.findById(student.driveId).select('title endDate status');
+        if (drive) {
+          const now = new Date();
+          let isExpired = false;
+          let formattedEndDate = '';
+          if (drive.status === 'Completed' || drive.status === 'Cancelled') {
+            isExpired = true;
+          } else if (drive.endDate) {
+            const end = new Date(drive.endDate);
+            if (!isNaN(end.getTime())) {
+              formattedEndDate = end.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+              if (end.getUTCHours() === 0 && end.getUTCMinutes() === 0 && end.getUTCSeconds() === 0) {
+                end.setUTCHours(23, 59, 59, 999);
+              }
+              if (now > end) isExpired = true;
+            }
+          }
+          if (isExpired) {
+            return res.status(403).json({
+              success: false,
+              code: 'DRIVE_TIMELINE_EXPIRED',
+              message: `The registration timeline for this campus drive ended on ${formattedEndDate || 'the specified deadline'}. Submissions are no longer accepted.`
+            });
+          }
+        }
+      }
+    }
+  }
 
     // 1. Check if user already exists in this company
     const existingUser = await User.findOne({ companyId: req.tenant.companyId, email });
@@ -91,12 +154,16 @@ router.post("/add", verifyPublicTenant, async (req, res) => {
       profile: {
         firstName: fullName,
         phone: contact,
+        dob: dob || null,
+        gender: gender || '',
+        maritalStatus: maritalStatus || '',
         emergencyContact: {
-          phone: emergencyContact
+          phone: emergencyContact || ''
         },
         linkedin: linkedin
       },
       education: {
+        qualification: qualification || degree || '',
         college: college,
         passingYear: year, // Mapping "year" to passingYear or current year
         specialization: department
@@ -111,7 +178,8 @@ router.post("/add", verifyPublicTenant, async (req, res) => {
       },
       system: {
         onboardingStatus: 'initial'
-      }
+      },
+      assessmentAnswers
     });
 
     await newUser.save();
@@ -122,16 +190,39 @@ router.post("/add", verifyPublicTenant, async (req, res) => {
       fullName,
       email,
       college,
-      year,
+      year: year || req.body.passingYear || req.body.graduationYear || '',
       department,
       role,
       contact,
-      emergencyContact,
+      emergencyContact: emergencyContact || '',
       onboardingDate,
       endDate,
-      linkedin,
+      linkedin: (linkedin && linkedin.trim()) ? linkedin.trim() : 'https://linkedin.com',
       internshipType,
+      applicationType: applicationType || 'Internship',
+      degree: degree || qualification || '',
+      location: location || '',
+      gender: gender || '',
+      maritalStatus: maritalStatus || '',
+      dob: dob || null,
+      countryCode: countryCode || '+91',
+      jobId: jobId || '',
+      assessmentAnswers,
       projectLinks,
+      campusStudentId: req.body.campusStudentId || null,
+      driveId: req.body.driveId || null,
+      collegeId: req.body.collegeId || null,
+      isExperienced: req.body.isExperienced === true || req.body.isExperienced === 'true',
+      experienceStatus: req.body.experienceStatus || (req.body.isExperienced ? 'experienced' : 'fresher'),
+      passingYear: req.body.passingYear || req.body.graduationYear || year || '',
+      cgpaOrPercentage: req.body.cgpaOrPercentage || req.body.cgpa || '',
+      previousOrg: req.body.previousOrg || req.body.currentCompany || '',
+      designation: req.body.designation || req.body.currentDesignation || '',
+      experienceYears: req.body.experienceYears || req.body.yearsOfExperience || '',
+      currentCtc: req.body.currentCtc || '',
+      expectedCtc: req.body.expectedCtc || '',
+      noticePeriod: req.body.noticePeriod || req.body.noticePeriodDays || '',
+      joiningDate: req.body.joiningDate || req.body.availableJoiningDate || '',
       status: 'initial',
       webAccess: webAccess === true || webAccess === 'true',
       remoteAccess: remoteAccess === true || remoteAccess === 'true',
@@ -146,7 +237,69 @@ router.post("/add", verifyPublicTenant, async (req, res) => {
       io.emit('activity-updated', { type: 'new_intern', intern: newIntern });
     }
 
+    const { formatApplicationEmailHtml } = require("../utilities/applicationEmailTemplate");
+    const emailHtml = formatApplicationEmailHtml({
+      applicationType: 'Internship',
+      fullName: newIntern.fullName,
+      email: newIntern.email,
+      phone: newIntern.contact,
+      dob: newIntern.dob,
+      gender: newIntern.gender,
+      maritalStatus: newIntern.maritalStatus,
+      location: newIntern.location,
+      degree: newIntern.degree,
+      qualification: newIntern.degree,
+      college: newIntern.college,
+      department: newIntern.department,
+      year: newIntern.year,
+      passingYear: newIntern.year,
+      role: newIntern.role,
+      jobId: newIntern.jobId,
+      linkedin: newIntern.linkedin,
+      projectLinks: newIntern.projectLinks,
+      assessmentAnswers: newIntern.assessmentAnswers
+    });
 
+    // Send initial application email to HR (with resume attachment if provided)
+    const internEmailOptions = {
+      to: req.tenant.receivingEmail,
+      subject: `New Intern Application: ${fullName} (${newIntern.role || 'Intern'})`,
+      html: emailHtml,
+      replyTo: req.tenant.receivingEmail,
+    };
+
+    if (resume) {
+      try {
+        const resumeBuffer = Buffer.from(resume, 'base64');
+        internEmailOptions.attachments = [
+          {
+            filename: `${(fullName || 'Intern').replace(/\s+/g, '_')}_Resume.pdf`,
+            content: resumeBuffer,
+            contentType: 'application/pdf'
+          }
+        ];
+      } catch (bufErr) {
+        console.error("Failed to parse resume buffer for intern email:", bufErr);
+      }
+    }
+
+    try {
+      await sendEmail(internEmailOptions);
+    } catch (emailErr) {
+      console.error("[InternAdd] Failed to send email:", emailErr);
+    }
+
+    if (req.body.campusStudentId) {
+      try {
+        const CampusStudentModel = req.models && req.models.CampusStudent ? req.models.CampusStudent : require('../models/CampusStudent');
+        await CampusStudentModel.updateOne(
+          { _id: req.body.campusStudentId, companyId: req.tenant.companyId },
+          { $set: { isOnboarded: true, onboardedAt: new Date(), linkedCandidateId: newIntern._id } }
+        );
+      } catch (csErr) {
+        console.error("[InternAdd] Failed to link CampusStudent:", csErr);
+      }
+    }
 
     res.status(200).json({
       message: "Intern stored successfully",
@@ -166,13 +319,24 @@ router.get("/all/initial", verifyTenant, async (req, res) => {
     if (req.user && req.user.role === 'manager') {
       query.assignedManager = req.user.id;
     }
-    const interns = await Intern.find(query);
+
+    const limit = parseInt(req.query.limit) || 0; // 0 = no limit (default, backwards-compat)
+    const isLimited = limit > 0;
+
+    let q = Intern.find(query).sort({ createdAt: -1 });
+    if (isLimited) {
+      // Dashboard only needs name/role/createdAt for the activity feed — don't load full docs
+      q = q.limit(limit).select('fullName role createdAt internId');
+    }
+
+    const interns = await q.lean();
     res.json(interns);
   } catch (error) {
     console.error("Fetch Error:", error);
     res.status(500).json({ message: "Server Error" });
   }
 });
+
 
 
 /* ===================================================
@@ -412,9 +576,7 @@ router.put("/accept/:id", verifyTenant,
         const formattedOnboardingDate = new Date(onboardingDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
         const formattedEndDate = new Date(endDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" });
 
-        const signatureHtml = customSignature
-          ? `<div style="margin-top: 30px;"><img src="${customSignature}" alt="Company Signature" style="max-height: 80px; display: block;" /></div>`
-          : getSignature(getLogoUrl());
+        const signatureHtml = getSignature(customSignature);
 
         const logoHtml = customLogo
           ? `<div style="margin-bottom: 20px;"><img src="${customLogo}" alt="Company Logo" style="max-height: 60px; display: block;" /></div>`
@@ -555,7 +717,7 @@ router.post("/resend-onboarding/:id", verifyTenant, async (req, res) => {
     const formattedOnboardingDate = intern.onboardingDate ? new Date(intern.onboardingDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "";
     const formattedEndDate = intern.endDate ? new Date(intern.endDate).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "";
 
-    const signatureHtml = customSignature ? `<div style="margin-top: 30px;"><img src="${customSignature}" alt="Company Signature" style="max-height: 80px; display: block;" /></div>` : getSignature(getLogoUrl());
+    const signatureHtml = getSignature(customSignature);
     const logoHtml = customLogo ? `<div style="margin-bottom: 20px;"><img src="${customLogo}" alt="Company Logo" style="max-height: 60px; display: block;" /></div>` : `<div style="margin-bottom: 20px;"><img src="${getLogoUrl()}" alt="Company Logo" style="max-height: 60px; display: block;" /></div>`;
 
     let htmlContent = "";
@@ -603,23 +765,98 @@ router.post("/resend-onboarding/:id", verifyTenant, async (req, res) => {
 
 router.put("/reject/:id", verifyTenant, async (req, res) => {
   try {
-    const intern = await Intern.findByIdAndUpdate(
-      req.params.id,
-      { managerApprovalStatus: 'rejected', status: 'rejected' },
-      { new: true }
-    );
+    const { id } = req.params;
+    const { reason, emailSubject, emailBody } = req.body;
 
+    let intern = await Intern.findById(id);
     if (!intern) {
       return res.status(404).json({ message: "Intern not found" });
     }
 
+    intern.status = 'rejected';
+    intern.managerApprovalStatus = 'rejected';
+    if (reason) intern.rejectionReason = reason;
+    await intern.save();
+
+    // 2. Fetch company settings for branding/signature
+    const Company = await _getMasterCompany();
+    const company = await Company.findById(req.tenant.companyId);
+    const customSignature = company?.settings?.communication?.emailSignatureUrl;
+
+    const signatureHtml = getSignature(customSignature);
+
+    // 3. Prepare email content
+    let finalHtml = emailBody;
+    const candRole = intern.role || intern.domain || "Candidate";
+    const reasonText = reason ? reason.trim() : "";
+
+    if (!finalHtml) {
+      const template = company?.settings?.communication?.applicationRejectionTemplate;
+      if (template) {
+        finalHtml = template
+          .replace(/{formattedName}/g, intern.fullName)
+          .replace(/{role}/g, candRole)
+          .replace(/{reason}/g, reasonText)
+          .replace(/{logo}/g, '')
+          .replace(/{signature}/g, signatureHtml);
+      } else {
+        finalHtml = `
+          <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+            <p>Dear ${intern.fullName},</p>
+            <p>Thank you for taking the time to apply for the <b>${candRole}</b> position with us and for your interest in our company.</p>
+            <p>After careful consideration and review of your application, we regret to inform you that we will not be moving forward with your candidacy for this role at this time.</p>
+            ${reasonText ? `<p>${reasonText}</p>` : ''}
+            <p>We truly appreciate the effort you put into your application and wish you the very best in your job search and future professional endeavors.</p>
+            <p>Best regards,</p>
+            ${signatureHtml}
+          </div>
+        `;
+      }
+    } else {
+      let enrichedBody = emailBody
+        .replace(/{formattedName}/g, intern.fullName)
+        .replace(/{role}/g, candRole)
+        .replace(/{reason}/g, reasonText)
+        .replace(/{logo}/g, '')
+        .replace(/{signature}/g, signatureHtml);
+
+      if (!enrichedBody.includes(signatureHtml) && !enrichedBody.includes('Company Signature') && !enrichedBody.includes('Authorized Signatory')) {
+        enrichedBody = `${enrichedBody}\n${signatureHtml}`;
+      }
+      finalHtml = enrichedBody;
+    }
+
+    const subject = emailSubject || `Update regarding your application for ${candRole} at Softrate`;
+
+    let emailSent = false;
+    let emailError = null;
+
+    if (intern.email) {
+      try {
+        // await sendEmail({
+        //   to: intern.email,
+        //   subject,
+        //   html: finalHtml,
+        //   replyTo: req.tenant?.receivingEmail,
+        // });
+        // emailSent = true;
+        // console.log(`[DEBUG] Rejection email sent to intern candidate: ${intern.email}`);
+      } catch (mailErr) {
+        emailError = mailErr.message;
+        console.error("Intern rejection email error:", mailErr);
+      }
+    }
+
     res.json({
-      message: "Intern rejected successfully",
+      success: true,
+      message: "Application rejected successfully",
       intern,
+      emailSent,
+      emailError
     });
   } catch (err) {
-    console.error("Reject Delete Error:", err);
-    res.status(500).json({ message: "Server error" });
+    console.error("Reject Error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 
@@ -658,18 +895,62 @@ router.post("/login", authController.login);
 router.get("/get/:id", verifyTenant, async (req, res) => {
   try {
     const id = req.params.id;
+
+    // ✅ Projection: exclude profilePhoto.data binary — the mobile dashboard
+    // doesn't render the profile photo here, it loads it separately.
+    // This avoids fetching potentially large binary blobs on every dashboard load.
+    const projection = { 'profilePhoto.data': 0 };
+
     let intern;
-
-    // Try finding by internid first
-    intern = await Intern.findOne({ internid: id });
-
-    // If not found and id is a valid MongoDB ObjectId, try finding by _id
-    if (!intern && mongoose.Types.ObjectId.isValid(id)) {
-      intern = await Intern.findById(id);
+    // Try ObjectId first (fast index hit), then internid
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      intern = await Intern.findById(id, projection).lean();
+    }
+    if (!intern) {
+      intern = await Intern.findOne({ internid: id }, projection).lean();
     }
 
     if (!intern) {
       return res.status(404).json({ message: "Intern not found" });
+    }
+
+    // Attach Shortlist record data if available so that interview info / projectLinks / CTC are populated
+    if (req.models && req.models.Shortlist) {
+      try {
+        const shortlist = await req.models.Shortlist.findOne({
+          candidateId: intern._id,
+          companyId: req.tenant.companyId
+        }).lean();
+        if (shortlist) {
+          intern.shortlist = shortlist;
+          if ((intern.currentCtc === undefined || intern.currentCtc === 0 || intern.currentCtc === null || intern.currentCtc === '') && shortlist.currentCtc) {
+            intern.currentCtc = shortlist.currentCtc;
+          }
+          if ((intern.expectedCtc === undefined || intern.expectedCtc === 0 || intern.expectedCtc === null || intern.expectedCtc === '') && shortlist.expectedCtc) {
+            intern.expectedCtc = shortlist.expectedCtc;
+          }
+          if ((intern.noticePeriod === undefined || intern.noticePeriod === 0 || intern.noticePeriod === null || intern.noticePeriod === '') && shortlist.noticePeriod) {
+            intern.noticePeriod = shortlist.noticePeriod;
+          }
+          if (!intern.previousOrg && shortlist.previousOrg) {
+            intern.previousOrg = shortlist.previousOrg;
+          }
+          if (!intern.experienceYears && shortlist.experienceYears) {
+            intern.experienceYears = shortlist.experienceYears;
+          }
+          if ((!intern.projectLinks || intern.projectLinks.length === 0) && shortlist.projectLinks?.length > 0) {
+            intern.projectLinks = shortlist.projectLinks;
+          }
+          if (!intern.linkedin && shortlist.linkedin) {
+            intern.linkedin = shortlist.linkedin;
+          }
+          if (!intern.degree && shortlist.qualification) {
+            intern.degree = shortlist.qualification;
+          }
+        }
+      } catch (shortlistErr) {
+        console.error("Error populating shortlist info for intern:", shortlistErr.message);
+      }
     }
 
     res.json({ intern });
@@ -968,6 +1249,188 @@ router.put("/update/:id", verifyTenant, async (req, res) => {
     res.json({ message: "Intern updated successfully", intern: updatedIntern });
   } catch (err) {
     console.error("Intern Update Error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+router.put("/shortlist/:id", verifyTenant, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { emailSubject, emailBody, meetDate, meetTime, meetLink, meetNotes, role, department } = req.body;
+    
+    let intern = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      intern = await Intern.findById(id);
+    }
+    if (!intern) {
+      intern = await Intern.findOne({ internid: id });
+    }
+    if (!intern && mongoose.Types.ObjectId.isValid(id)) {
+      const Employee = require("../models/EmployeeModel.js");
+      intern = await Employee.findById(id);
+    }
+
+    if (!intern) return res.status(404).json({ message: "Candidate not found" });
+
+    // 1. Update status
+    intern.status = "shortlist";
+    intern.managerApprovalStatus = "shortlist";
+    if (role) intern.role = role;
+    if (department) intern.department = department;
+    await intern.save();
+
+    // 1b. Create or Update Shortlist document
+    let rescheduleBtnHtml = "";
+    if (req.models.Shortlist) {
+      try {
+        const parsedMeetDate = meetDate ? new Date(meetDate) : new Date();
+        const { generateRawToken, createRescheduleToken, buildRescheduleUrl, buildRescheduleButtonHtml } = require("../utilities/rescheduleHelper");
+        const rawToken = generateRawToken();
+        const shortlistRecord = await req.models.Shortlist.findOneAndUpdate(
+          { companyId: req.tenant.companyId, candidateId: intern._id },
+          {
+            companyId: req.tenant.companyId,
+            candidateId: intern._id,
+            candidateType: "Intern",
+            fullName: intern.fullName,
+            email: intern.email,
+            phone: intern.phone || "",
+            role: intern.role || "",
+            department: intern.department || "",
+            qualification: intern.qualification || intern.degree || "",
+            college: intern.college || "",
+            location: intern.location || "",
+            linkedin: intern.linkedin || "",
+            projectLinks: intern.projectLinks || [],
+            meetDate: isNaN(parsedMeetDate.getTime()) ? new Date() : parsedMeetDate,
+            meetTime: meetTime || "11:00 AM",
+            meetLink: meetLink || "",
+            meetNotes: meetNotes || "",
+            emailSubject: emailSubject || "",
+            emailBody: emailBody || "",
+            rescheduleToken: rawToken,
+            status: "scheduled",
+            scheduledBy: {
+              userId: req.user?.id || "",
+              name: req.user?.name || "HR Team"
+            },
+            scheduledAt: new Date()
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        if (shortlistRecord) {
+          const signedRescheduleToken = createRescheduleToken(
+            shortlistRecord._id,
+            req.tenant.companyId,
+            rawToken
+          );
+          const rescheduleUrl = buildRescheduleUrl(signedRescheduleToken);
+          rescheduleBtnHtml = buildRescheduleButtonHtml(rescheduleUrl);
+        }
+      } catch (shortlistErr) {
+        console.error("Failed to sync Shortlist record:", shortlistErr);
+      }
+    }
+
+    // 2. Fetch company settings for branding/signature
+    const Company = await _getMasterCompany();
+    const company = await Company.findById(req.tenant.companyId);
+    const customSignature = company?.settings?.communication?.emailSignatureUrl;
+
+    const signatureHtml = getSignature(customSignature);
+
+    // 3. Prepare email content
+    let finalHtml = emailBody;
+    if (!finalHtml) {
+      const template = company?.settings?.communication?.shortlistInterviewTemplate;
+      if (template) {
+        finalHtml = template
+          .replace(/{formattedName}/g, intern.fullName)
+          .replace(/{role}/g, intern.role || "Candidate")
+          .replace(/{meetDate}/g, meetDate || "TBD")
+          .replace(/{meetTime}/g, meetTime || "TBD")
+          .replace(/{meetLink}/g, meetLink || "Will be shared shortly")
+          .replace(/{meetNotes}/g, meetNotes || "None")
+          .replace(/{rescheduleButton}/g, rescheduleBtnHtml)
+          .replace(/{logo}/g, '')
+          .replace(/{signature}/g, signatureHtml);
+
+        if (rescheduleBtnHtml && !finalHtml.includes("Request to Reschedule")) {
+          finalHtml = finalHtml.replace(signatureHtml, `${rescheduleBtnHtml}\n${signatureHtml}`);
+        }
+      } else {
+        finalHtml = `
+          <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+            <p>Dear ${intern.fullName},</p>
+            <p>Congratulations! We are pleased to inform you that your application for the <b>${intern.role || 'Role'}</b> position has been shortlisted.</p>
+            <p>We would like to invite you for an interview / discussion meeting scheduled as follows:</p>
+            <ul>
+              <li><b>Date & Time:</b> ${meetDate || 'TBD'} at ${meetTime || 'TBD'}</li>
+              <li><b>Meeting Platform / Link:</b> <a href="${meetLink || '#'}" target="_blank" style="color: #007bb6;">${meetLink || 'Link will be provided'}</a></li>
+              <li><b>Notes / Instructions:</b> ${meetNotes || 'Please join on time.'}</li>
+            </ul>
+            ${rescheduleBtnHtml}
+            <p>Please make sure to join on time.</p>
+            <p>Best regards,</p>
+            ${signatureHtml}
+          </div>
+        `;
+      }
+    } else {
+      let enrichedBody = emailBody
+        .replace(/{formattedName}/g, intern.fullName)
+        .replace(/{role}/g, intern.role || "Candidate")
+        .replace(/{meetDate}/g, meetDate || "")
+        .replace(/{meetTime}/g, meetTime || "")
+        .replace(/{meetLink}/g, meetLink || "")
+        .replace(/{meetNotes}/g, meetNotes || "")
+        .replace(/{rescheduleButton}/g, rescheduleBtnHtml)
+        .replace(/{logo}/g, '')
+        .replace(/{signature}/g, signatureHtml);
+
+      if (rescheduleBtnHtml && !enrichedBody.includes("Request to Reschedule")) {
+        enrichedBody = `${enrichedBody}\n${rescheduleBtnHtml}`;
+      }
+
+      if (!enrichedBody.includes(signatureHtml) && !enrichedBody.includes('Company Signature') && !enrichedBody.includes('Authorized Signatory')) {
+        enrichedBody = `${enrichedBody}\n${signatureHtml}`;
+      }
+      finalHtml = enrichedBody;
+    }
+
+    const subject = emailSubject || `Application Shortlisted - Interview Scheduled for ${intern.role || 'Role'} at Softrate`;
+
+    let emailSent = false;
+    let emailError = null;
+
+    if (intern.email) {
+      try {
+        await sendEmail({
+          to: intern.email,
+          subject,
+          html: finalHtml,
+          replyTo: req.tenant?.receivingEmail,
+        });
+        emailSent = true;
+        console.log(`[DEBUG] Shortlist interview email sent to candidate: ${intern.email}`);
+      } catch (mailErr) {
+        emailError = mailErr.message;
+        console.error("Shortlist email error:", mailErr);
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: emailSent 
+        ? "Candidate shortlisted and interview schedule email sent successfully" 
+        : `Candidate shortlisted, but email failed: ${emailError || 'No email address found'}`,
+      intern,
+      emailSent,
+      emailError 
+    });
+  } catch (err) {
+    console.error("Shortlist error:", err);
     res.status(500).json({ message: "Server error", error: err.message });
   }
 });

@@ -3,6 +3,7 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { DomSanitizer, SafeStyle } from '@angular/platform-browser';
 import { ApiService } from '../../services/api.service';
+import { AlertService } from '../../shared/services/alert';
 import { MobileProfileComponent } from './mobile-profile/mobile-profile';
 import { Router } from '@angular/router';
 
@@ -14,9 +15,10 @@ import { Router } from '@angular/router';
   styleUrl: './profile.css'
 })
 export class ProfileComponent implements OnInit {
-  private apiService = inject(ApiService);
-  private sanitizer  = inject(DomSanitizer);
-  private router     = inject(Router);
+  private apiService   = inject(ApiService);
+  private alertService = inject(AlertService);
+  private sanitizer    = inject(DomSanitizer);
+  private router       = inject(Router);
 
   logout() {
     localStorage.removeItem('user_role');
@@ -49,6 +51,16 @@ export class ProfileComponent implements OnInit {
   mfaQrCodeUrl = signal<string>('');
   mfaSetupCode = signal<string>('');
   mfaDisableCode = signal<string>('');
+  minDobDate: string = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 100);
+    return d.toISOString().split('T')[0];
+  })();
+  maxDobDate: string = (() => {
+    const d = new Date();
+    d.setFullYear(d.getFullYear() - 18);
+    return d.toISOString().split('T')[0];
+  })();
 
   // ── Computed: handles HR / Employee / Intern field differences ──────────────
   displayName = computed(() => {
@@ -82,6 +94,7 @@ export class ProfileComponent implements OnInit {
     const u = this.user();
     if (!u) return 0;
     
+    const isInternUser = this.role() === 'intern' || !!u.internid;
     const fieldsToTrack = [
       u.fullName,
       u.email,
@@ -93,6 +106,13 @@ export class ProfileComponent implements OnInit {
       u.maritalStatus,
       u.aboutMe,
       u.askMeAboutExpertise,
+      ...(isInternUser ? [] : [
+        u.panNumber,
+        u.uanNumber,
+        u.bankDetails?.accountNumber,
+        u.bankDetails?.ifscCode,
+        u.bankDetails?.bankName
+      ]),
       u.profilePhotoUrl || u.profilePhoto?.url || u.profilePhoto?.data
     ];
     
@@ -139,6 +159,14 @@ export class ProfileComponent implements OnInit {
   displayAddress = computed(() => this.user()?.address || '-');
   displayEmergencyName = computed(() => this.user()?.emergencyName || '-');
   displayEmergencyPhone = computed(() => this.user()?.emergencyPhone || '-');
+  displayPan = computed(() => this.user()?.panNumber || '-');
+  displayUan = computed(() => this.user()?.uanNumber || '-');
+  displayEsi = computed(() => this.user()?.esiNumber || '-');
+  displayBankName = computed(() => this.user()?.bankDetails?.bankName || '-');
+  displayAccountNumber = computed(() => this.user()?.bankDetails?.accountNumber || '-');
+  displayIfscCode = computed(() => this.user()?.bankDetails?.ifscCode || '-');
+  displayBranchName = computed(() => this.user()?.bankDetails?.branchName || '-');
+  displayAccountHolderName = computed(() => this.user()?.bankDetails?.accountHolderName || '-');
   
   displayExpertise = computed(() => {
     const expertise = this.user()?.askMeAboutExpertise;
@@ -294,7 +322,17 @@ export class ProfileComponent implements OnInit {
         emergencyName: u?.emergencyName || '',
         emergencyPhone: u?.emergencyPhone || '',
         aboutMe: u?.aboutMe || '',
-        askMeAboutExpertise: tags.join(',')
+        askMeAboutExpertise: tags.join(','),
+        panNumber: u?.panNumber || '',
+        uanNumber: u?.uanNumber || '',
+        esiNumber: u?.esiNumber || '',
+        bankDetails: {
+          bankName: u?.bankDetails?.bankName || '',
+          accountNumber: u?.bankDetails?.accountNumber || '',
+          ifscCode: u?.bankDetails?.ifscCode || '',
+          branchName: u?.bankDetails?.branchName || '',
+          accountHolderName: u?.bankDetails?.accountHolderName || ''
+        }
       };
       this.isEditing.set(true);
     }
@@ -318,10 +356,46 @@ export class ProfileComponent implements OnInit {
     
     // Auto-calculate age from DOB if present
     if (data.dob) {
-      const calcAge = this.calculateAge(data.dob);
-      if (calcAge) {
-        data.age = parseInt(calcAge, 10);
+      const selectedDate = new Date(data.dob);
+      const today = new Date();
+      if (isNaN(selectedDate.getTime())) {
+        this.alertService.show('Please enter a valid Date of Birth.');
+        return;
       }
+      if (selectedDate > today) {
+        this.alertService.show('Date of Birth cannot be in the future.');
+        return;
+      }
+
+      let age = today.getFullYear() - selectedDate.getFullYear();
+      const m = today.getMonth() - selectedDate.getMonth();
+      if (m < 0 || (m === 0 && today.getDate() < selectedDate.getDate())) {
+        age--;
+      }
+      if (age < 18) {
+        this.alertService.show('Minimum age requirement is 18 years.');
+        return;
+      }
+      if (age > 100) {
+        this.alertService.show('Please enter a valid Date of Birth (Age cannot exceed 100 years).');
+        return;
+      }
+
+      data.age = age;
+    }
+
+    // Sanitize and uppercase PAN / IFSC
+    if (data.panNumber) data.panNumber = data.panNumber.trim().toUpperCase();
+    if (data.uanNumber) data.uanNumber = data.uanNumber.trim();
+    if (data.esiNumber) data.esiNumber = data.esiNumber.trim();
+    if (data.bankDetails) {
+      data.bankDetails = {
+        bankName: (data.bankDetails.bankName || '').trim(),
+        accountNumber: (data.bankDetails.accountNumber || '').trim(),
+        ifscCode: (data.bankDetails.ifscCode || '').trim().toUpperCase(),
+        branchName: (data.bankDetails.branchName || '').trim(),
+        accountHolderName: (data.bankDetails.accountHolderName || '').trim()
+      };
     }
 
     // Convert tags back to string (or keep as array if backend accepts it)

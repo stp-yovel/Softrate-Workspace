@@ -800,12 +800,40 @@ input[type=number] {
   color: #991b1b;
 }
 
+.tbl-status-chip.shortlist,
+.tbl-status-chip.shortlisted {
+  background: #eff6ff;
+  color: #1d4ed8;
+}
+
+.tbl-status-chip.maybe {
+  background: #fefce8;
+  color: #b45309;
+}
+
 .tbl-status-chip.initial {
   background: #f1f5f9;
   color: #475569;
 }
 
 /* Actions */
+.tbl-actions-col {
+  position: sticky;
+  right: 0;
+  z-index: 5;
+  background: #ffffff;
+  box-shadow: -4px 0 8px -2px rgba(0, 0, 0, 0.06);
+}
+
+thead th.tbl-actions-col {
+  z-index: 6;
+  background: #f8fafc;
+}
+
+tbody tr:hover td.tbl-actions-col {
+  background: #fafbfc;
+}
+
 .tbl-actions {
   display: flex;
   align-items: center;
@@ -816,34 +844,41 @@ input[type=number] {
 .tbl-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.35rem 0.75rem;
-  border-radius: 8px;
-  font-size: 0.75rem;
-  font-weight: var(--font-weight-semibold);
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border-radius: 10px;
+  font-size: 13px;
   cursor: pointer;
-  border: none;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
   white-space: nowrap;
   text-decoration: none;
   transition: all 0.15s ease;
+  box-sizing: border-box;
 }
 
 .tbl-btn-reject {
-  background: #fee2e2;
-  color: #b91c1c;
+  background: #ffffff;
+  color: #dc2626;
+  border: 1px solid #e2e8f0;
 }
 
 .tbl-btn-reject:hover {
-  background: #fecaca;
+  background: #fef2f2;
+  border-color: #fecaca;
 }
 
 .tbl-btn-approve {
-  background: #0f172a;
-  color: #fff;
+  background: #ffffff;
+  color: #0284c7;
+  border: 1px solid #e2e8f0;
 }
 
 .tbl-btn-approve:hover {
-  background: #1e293b;
+  background: #f0f9ff;
+  border-color: #bae6fd;
 }
 
 .tbl-status-done {

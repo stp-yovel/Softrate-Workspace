@@ -2,7 +2,7 @@ import { Component, inject, signal, HostListener, ViewChild, ElementRef } from '
 import { RouterOutlet, RouterLink, RouterLinkActive, Router } from '@angular/router';
 import { CommonModule } from '@angular/common';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
-import { Home01Icon, StudentsIcon, WorkflowSquare03Icon, DashboardSquareRemoveIcon, Settings01Icon, DiplomaIcon, DashboardSquare02Icon, DashboardSpeed01Icon, UserGroupIcon, WorkIcon, Calendar03Icon, PolicyIcon, FingerAccessIcon, CalendarCheckIn01Icon, SentIcon, Invoice01Icon, Notification01Icon, PanelLeftCloseIcon, PanelLeftOpenIcon, UserAccountIcon, Logout02Icon, LicenseDraftIcon, Delete01Icon, Calendar01Icon } from '@hugeicons/core-free-icons';
+import { Home01Icon, StudentsIcon, WorkflowSquare03Icon, DashboardSquareRemoveIcon, Settings01Icon, DiplomaIcon, DashboardSquare02Icon, DashboardSpeed01Icon, UserGroupIcon, WorkIcon, Calendar03Icon, PolicyIcon, FingerAccessIcon, CalendarCheckIn01Icon, SentIcon, Invoice01Icon, Notification01Icon, PanelLeftCloseIcon, PanelLeftOpenIcon, UserAccountIcon, Logout02Icon, LicenseDraftIcon, Delete01Icon, Calendar01Icon, Mortarboard02Icon } from '@hugeicons/core-free-icons';
 import { forkJoin } from 'rxjs';
 import { Alert } from './shared/components/alert/alert';
 import { AlertService } from './shared/services/alert';
@@ -56,6 +56,7 @@ export class App {
   readonly UserAccountIcon = UserAccountIcon;
   readonly Logout02Icon = Logout02Icon;
   readonly Delete01Icon = Delete01Icon;
+  readonly Mortarboard02Icon = Mortarboard02Icon;
 
   userRole = signal<string | null>(localStorage.getItem('user_role'));
   userName = signal<string | null>(null);
@@ -546,6 +547,9 @@ export class App {
   }
 
   refreshMe() {
+    const token = localStorage.getItem('auth_token');
+    if (!token) return;
+
     this.apiService.getMe().subscribe({
       next: (res: any) => {
         if (res.success && res.user) {
@@ -562,15 +566,18 @@ export class App {
         console.error('getMe failed, logging out:', err);
         // Only force logout on invalid session/token (401 / 403 status codes)
         if (err.status === 401 || err.status === 403 || !localStorage.getItem('auth_token')) {
-          this.logout();
+          if (!this.isLoginPage()) {
+            this.logout();
+          }
         }
       }
     });
   }
 
   isLoginPage(): boolean {
-    const url = this.currentUrl().split('?')[0]; // Use signal for reactivity
-    return url === '/login' || url === '/register' || url === '/user-register' || url === '/' || url.startsWith('/id-card');
+    const rawPath = typeof window !== 'undefined' ? window.location.pathname.replace(/^\/hrms/, '') : '';
+    const url = (this.currentUrl() || rawPath || '').split('?')[0]; // Use signal for reactivity
+    return url === '/login' || url === '/register' || url === '/user-register' || url === '/reschedule' || url === '/' || url === '' || url.startsWith('/id-card');
   }
 
   getGreeting(): string {
@@ -610,6 +617,8 @@ export class App {
     this.userRole.set(null);
     this.currentUser.set(null);
     this.showUserMenu.set(false);
-    this.router.navigate(['/login']);
+    if (!this.isLoginPage()) {
+      this.router.navigate(['/login']);
+    }
   }
 }

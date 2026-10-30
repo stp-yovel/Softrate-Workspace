@@ -134,17 +134,284 @@
         </div>
       </div>
 
+      <!-- Additional Information & Assessment Section -->
+      <div class="additional-info-container" *ngIf="hasAdditionalInfo()">
+        <div class="additional-info-header">
+          <h3>Additional Information</h3>
+          <p>Submitted candidate background and assessment responses.</p>
+        </div>
+
+        <!-- 1. Key-Value Information Grid -->
+        <div class="info-summary-grid">
+          <div class="info-cell" *ngIf="applicantDetails().currentCtc !== undefined && applicantDetails().currentCtc !== null && applicantDetails().currentCtc !== ''">
+            <span class="info-cell-label">Current CTC</span>
+            <span class="info-cell-val">₹ {{ applicantDetails().currentCtc }} LPA</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().expectedCtc !== undefined && applicantDetails().expectedCtc !== null && applicantDetails().expectedCtc !== ''">
+            <span class="info-cell-label">Expected CTC</span>
+            <span class="info-cell-val">₹ {{ applicantDetails().expectedCtc }} LPA</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().noticePeriod !== undefined && applicantDetails().noticePeriod !== null && applicantDetails().noticePeriod !== ''">
+            <span class="info-cell-label">Notice Period</span>
+            <span class="info-cell-val">{{ applicantDetails().noticePeriod == 0 ? 'Immediate' : applicantDetails().noticePeriod + ' Days' }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().previousOrg">
+            <span class="info-cell-label">Previous Company</span>
+            <span class="info-cell-val">{{ applicantDetails().previousOrg }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().experienceYears">
+            <span class="info-cell-label">Experience</span>
+            <span class="info-cell-val">{{ applicantDetails().experienceYears }} {{ !applicantDetails().experienceYears.toString().toLowerCase().includes('yr') && !applicantDetails().experienceYears.toString().toLowerCase().includes('year') ? 'Years' : '' }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().degree">
+            <span class="info-cell-label">Degree / Qualification</span>
+            <span class="info-cell-val">{{ applicantDetails().degree }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().year">
+            <span class="info-cell-label">Year / Batch</span>
+            <span class="info-cell-val">{{ applicantDetails().year }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().location">
+            <span class="info-cell-label">Location</span>
+            <span class="info-cell-val">{{ applicantDetails().location }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().gender">
+            <span class="info-cell-label">Gender</span>
+            <span class="info-cell-val">{{ applicantDetails().gender }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().dob">
+            <span class="info-cell-label">Date of Birth</span>
+            <span class="info-cell-val">{{ applicantDetails().dob }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().maritalStatus">
+            <span class="info-cell-label">Marital Status</span>
+            <span class="info-cell-val">{{ applicantDetails().maritalStatus }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().emergencyContact">
+            <span class="info-cell-label">Emergency Contact</span>
+            <span class="info-cell-val">{{ applicantDetails().emergencyContact }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().jobId">
+            <span class="info-cell-label">Job ID</span>
+            <span class="info-cell-val">{{ applicantDetails().jobId }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().createdAt">
+            <span class="info-cell-label">Applied Date</span>
+            <span class="info-cell-val">{{ applicantDetails().createdAt | date:'d MMM y' }}</span>
+          </div>
+          <div class="info-cell" *ngIf="applicantDetails().linkedin">
+            <span class="info-cell-label">LinkedIn</span>
+            <span class="info-cell-val">
+              <a [href]="applicantDetails().linkedin.startsWith('http') ? applicantDetails().linkedin : 'https://' + applicantDetails().linkedin" target="_blank" class="info-link">
+                <i class="fa-brands fa-linkedin"></i> View Profile
+              </a>
+            </span>
+          </div>
+        </div>
+
+        <!-- 2. Project Links -->
+        <div class="project-links-box" *ngIf="applicantDetails().projectLinks && applicantDetails().projectLinks.length > 0">
+          <div class="box-title">Project & Portfolio Links</div>
+          <div class="links-list">
+            <a *ngFor="let link of applicantDetails().projectLinks" 
+               [href]="link.startsWith('http') ? link : 'https://' + link" 
+               target="_blank" 
+               class="project-link-chip">
+              <i class="fa-solid fa-arrow-up-right-from-square"></i>
+              <span>{{ link }}</span>
+            </a>
+          </div>
+        </div>
+
+        <!-- 3. Assessment Responses -->
+        <div class="assessment-box" *ngIf="getAssessmentEntries().length > 0">
+          <div class="box-title">
+            <span>Assessment Responses</span>
+            <span class="assessment-badge">{{ getAssessmentEntries().length }} Questions</span>
+          </div>
+          <div class="assessment-grid">
+            <div class="assessment-item" *ngFor="let item of getAssessmentEntries()">
+              <div class="assessment-q">{{ item.label }}</div>
+              <div class="assessment-a" *ngIf="!item.isLinks">{{ item.value }}</div>
+              <div class="links-list" *ngIf="item.isLinks" style="margin-top: 6px;">
+                <a *ngFor="let link of item.links" 
+                   [href]="link.startsWith('http') ? link : 'https://' + link" 
+                   target="_blank" 
+                   class="project-link-chip">
+                  <i class="fa-solid fa-arrow-up-right-from-square"></i>
+                  <span>{{ link }}</span>
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div class="form-actions">
-        <button type="button" class="btn-secondary" routerLink="/interns/requests">
-          <i class="fa-solid fa-xmark"></i>
+        <button type="button" class="btn-cancel" [routerLink]="['/interns']" [queryParams]="{tab: 'requests'}">
           Cancel
         </button>
-        <button type="submit" class="btn-primary" [disabled]="isSaving()">
-          <i class="fa-solid fa-floppy-disk" *ngIf="!isSaving()"></i>
-          <span *ngIf="!isSaving()">{{ isEditMode() ? 'Save Changes' : (isApprovalMode() ? 'Approve & Onboard' : 'Register Intern') }}</span>
-          <span *ngIf="isSaving()">{{ isEditMode() ? 'Updating...' : 'Saving...' }}</span>
+
+        <div class="action-btn-group" *ngIf="isApprovalMode()">
+          <button type="button" class="btn-danger-outline" (click)="openRejectModal()" [disabled]="isSaving() || isUpdatingStatus() !== null || isSendingReject()">
+            <span>Reject</span>
+          </button>
+
+          <button type="button" class="btn-outline" (click)="updateStatus('maybe')" [disabled]="isSaving() || isUpdatingStatus() !== null || isSendingReject()">
+            <span>{{ isUpdatingStatus() === 'maybe' ? 'Updating...' : 'Maybe' }}</span>
+          </button>
+
+          <button type="button" class="btn-outline" (click)="openShortlistModal()" [disabled]="isSaving() || isUpdatingStatus() !== null || isSendingReject()">
+            <span>Shortlist</span>
+          </button>
+        </div>
+
+        <button type="submit" class="btn-primary" [disabled]="isSaving() || isUpdatingStatus() !== null || isSendingReject()">
+          <span>{{ isEditMode() ? (isSaving() ? 'Updating...' : 'Save Changes') : (isApprovalMode() ? (isSaving() ? 'Onboarding...' : 'Approve & Onboard') : (isSaving() ? 'Saving...' : 'Register Intern')) }}</span>
         </button>
       </div>
     </form>
+  </div>
+
+  <!-- Reject Application Modal -->
+  <div class="modal-backdrop" *ngIf="showRejectModal()" (click)="closeRejectModal()">
+    <div class="modal-dialog shortlist-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3>Reject Application</h3>
+          <p>Send a rejection notification email to {{ intern.fullName || 'the candidate' }}.</p>
+        </div>
+        <button type="button" class="btn-close-modal" (click)="closeRejectModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Candidate Preview Tag -->
+        <div class="candidate-mini-card">
+          <div class="candidate-meta">
+            <span class="candidate-name">{{ intern.fullName }}</span>
+            <span class="candidate-role">{{ intern.role || 'Applicant' }}</span>
+          </div>
+          <span class="candidate-email">{{ intern.email }}</span>
+        </div>
+
+        <!-- Optional Reason Input -->
+        <div class="form-group" style="margin-top: 1rem;">
+          <label style="font-size: 13px; font-weight: 600; color: #1e293b;">Rejection Feedback / Notes (Optional)</label>
+          <input 
+            type="text" 
+            [(ngModel)]="rejectForm.reason" 
+            (ngModelChange)="generateRejectEmailBody()" 
+            placeholder="e.g. Currently seeking candidates with stronger proficiency in specific domain."
+            class="modal-input"
+          >
+          <p style="font-size: 11px; color: #64748b; margin-top: 4px;">This note will be incorporated into the candidate's rejection email.</p>
+        </div>
+
+        <!-- Email Content Editor -->
+        <div class="email-editor-section">
+          <div class="editor-header">
+            <label>Rejection Email Content</label>
+            <button type="button" class="btn-regen" (click)="generateRejectEmailBody()" title="Reset to default template">
+              <i class="fa-solid fa-arrows-rotate"></i> Reset Template
+            </button>
+          </div>
+
+          <div class="form-group">
+            <input type="text" [(ngModel)]="rejectForm.emailSubject" placeholder="Email Subject" class="modal-input subject-input">
+          </div>
+
+          <div class="form-group">
+            <textarea [(ngModel)]="rejectForm.emailBody" rows="6" class="modal-textarea" placeholder="Email body content"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" (click)="closeRejectModal()" [disabled]="isSendingReject()">
+          Cancel
+        </button>
+        <button type="button" class="btn-danger" (click)="submitReject()" [disabled]="isSendingReject()">
+          <span>{{ isSendingReject() ? 'Rejecting...' : 'Confirm & Send Rejection Email' }}</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Shortlist & Meeting Scheduler Modal -->
+  <div class="modal-backdrop" *ngIf="showShortlistModal()" (click)="closeShortlistModal()">
+    <div class="modal-dialog shortlist-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3>Schedule Interview & Shortlist</h3>
+          <p>Send an interview discussion invite to {{ intern.fullName || 'the candidate' }}.</p>
+        </div>
+        <button type="button" class="btn-close-modal" (click)="closeShortlistModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Candidate Preview Tag -->
+        <div class="candidate-mini-card">
+          <div class="candidate-meta">
+            <span class="candidate-name">{{ intern.fullName }}</span>
+            <span class="candidate-role">{{ intern.role || 'Applicant' }}</span>
+          </div>
+          <span class="candidate-email">{{ intern.email }}</span>
+        </div>
+
+        <!-- Meeting Details Form -->
+        <div class="scheduler-grid">
+          <div class="form-group">
+            <label>Interview Date *</label>
+            <input type="date" [(ngModel)]="shortlistForm.meetDate" (ngModelChange)="generateShortlistEmailBody()" class="modal-input" required>
+          </div>
+
+          <div class="form-group">
+            <label>Interview Time *</label>
+            <input type="time" [(ngModel)]="shortlistForm.meetTime" (ngModelChange)="generateShortlistEmailBody()" class="modal-input" required>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Meeting Link / Platform URL *</label>
+            <input type="url" [(ngModel)]="shortlistForm.meetLink" (ngModelChange)="generateShortlistEmailBody()" placeholder="https://meet.google.com/xxx-yyyy-zzz" class="modal-input" required>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Meeting Instructions / Notes</label>
+            <input type="text" [(ngModel)]="shortlistForm.meetNotes" (ngModelChange)="generateShortlistEmailBody()" placeholder="e.g. Technical interview discussion. Please keep your laptop ready." class="modal-input">
+          </div>
+        </div>
+
+        <!-- Email Content Editor -->
+        <div class="email-editor-section">
+          <div class="editor-header">
+            <label>Email Notification Content</label>
+            <button type="button" class="btn-regen" (click)="generateShortlistEmailBody()" title="Reset to default template">
+              <i class="fa-solid fa-arrows-rotate"></i> Reset Template
+            </button>
+          </div>
+
+          <div class="form-group">
+            <input type="text" [(ngModel)]="shortlistForm.emailSubject" placeholder="Email Subject" class="modal-input subject-input">
+          </div>
+
+          <div class="form-group">
+            <textarea [(ngModel)]="shortlistForm.emailBody" rows="5" class="modal-textarea" placeholder="Email body content"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" (click)="closeShortlistModal()" [disabled]="isSendingShortlist()">
+          Cancel
+        </button>
+        <button type="button" class="btn-primary" (click)="submitShortlistWithMeeting()" [disabled]="isSendingShortlist() || !shortlistForm.meetDate || !shortlistForm.meetLink">
+          <span>{{ isSendingShortlist() ? 'Sending & Shortlisting...' : 'Send Invite & Shortlist' }}</span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>

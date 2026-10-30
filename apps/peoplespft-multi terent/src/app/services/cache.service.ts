@@ -26,7 +26,15 @@ export class HttpCacheService {
     return entry.response;
   }
 
-  clear(): void {
-    this.cache.clear();
+  clear(pattern?: string): void {
+    if (!pattern) {
+      this.cache.clear();
+      return;
+    }
+    for (const key of Array.from(this.cache.keys())) {
+      if (key.includes(pattern)) {
+        this.cache.delete(key);
+      }
+    }
   }
 }

@@ -1,0 +1,789 @@
+<div class="main-content-layout">
+  <!-- LEFT: MAIN CONTENT SECTION -->
+  <div class="data-section">
+    <!-- EMBEDDED SINGLE-LINE PAGE HEADER -->
+    <div class="page-header-embedded">
+      <div class="header-main">
+        <div class="header-title-flex">
+          <a routerLink="/employees" class="btn-back-nav" title="Back to Employees">
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+          </a>
+          <div>
+            <h1>Shortlisted Candidates</h1>
+            <p>Track scheduled interviews, interviewer remarks, and direct onboarding.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- HEADER TOOLS: ALL IN ONE SINGLE LINE -->
+      <div class="header-tools" id="tour-shortlist-filters">
+        <!-- STATUS TABS FILTER -->
+        <div class="status-filters">
+          <button class="filter-chip" [class.active]="activeTab() === 'active'" (click)="setTab('active')">
+            Active ({{ metrics().totalActiveCount }})
+          </button>
+          <button class="filter-chip" [class.active]="activeTab() === 'reschedule'" (click)="setTab('reschedule')">
+            Reschedule Requests ({{ metrics().reschedulePendingCount || 0 }})
+          </button>
+          <button class="filter-chip" [class.active]="activeTab() === 'interviewed'" (click)="setTab('interviewed')">
+            Interviewed ({{ metrics().interviewedCount }})
+          </button>
+          <button class="filter-chip" [class.active]="activeTab() === 'onboarded'" (click)="setTab('onboarded')">
+            Onboarded
+          </button>
+          <button class="filter-chip" [class.active]="activeTab() === 'rejected'" (click)="setTab('rejected')">
+            Rejected
+          </button>
+          <button class="filter-chip" [class.active]="activeTab() === 'all'" (click)="setTab('all')">
+            All
+          </button>
+        </div>
+
+        <!-- SEARCH CONTAINER -->
+        <div class="search-container">
+          <svg class="search-icon" xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input 
+            type="text" 
+            placeholder="Search candidate..." 
+            [(ngModel)]="searchQuery" 
+            (ngModelChange)="onSearchChange()"
+          >
+        </div>
+
+        <!-- REFRESH BUTTON -->
+        <button class="btn-refresh-icon" (click)="loadCandidates(true)" [disabled]="isLoading()" title="Refresh list">
+          <hugeicons-icon [icon]="RefreshIcon" size="16" [strokeWidth]="1.8" color="#475569" [class.spin]="isLoading()"></hugeicons-icon>
+        </button>
+      </div>
+    </div>
+
+    <!-- CANDIDATES SINGLE-LINE TABLE CONTAINER -->
+    <div class="table-responsive-wrapper">
+      <table class="enterprise-table">
+        <thead>
+          <tr>
+            <th>Candidate</th>
+            <th>Role & Dept</th>
+            <th>Interview Schedule</th>
+            <th>Meeting Link</th>
+            <th>Remarks</th>
+            <th>Status</th>
+            <th class="text-right">Actions</th>
+          </tr>
+        </thead>
+
+        <tbody>
+          <!-- Loading State -->
+          <tr *ngIf="isLoading()">
+            <td colspan="7" class="state-cell">
+              <div class="loading-spinner-box">
+                <div class="spinner"></div>
+                <span>Loading shortlisted candidates...</span>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Empty State -->
+          <tr *ngIf="!isLoading() && candidates().length === 0">
+            <td colspan="7" class="state-cell">
+              <div class="empty-state-box">
+                <hugeicons-icon [icon]="UserCheckIcon" size="40" [strokeWidth]="1.2" color="#cbd5e1"></hugeicons-icon>
+                <h3>No candidates found</h3>
+                <p>There are currently no shortlisted candidates matching this filter.</p>
+              </div>
+            </td>
+          </tr>
+
+          <!-- Data Rows (Single Line) -->
+          <tr *ngFor="let c of candidates()" class="candidate-row">
+            <!-- 1. Candidate Details (Single Line) -->
+            <td class="candidate-cell nowrap-cell">
+              <div class="candidate-profile-flex">
+                <div class="avatar-circle" [class.avatar-intern]="c.candidateType === 'Intern'">
+                  {{ getInitials(c.fullName) }}
+                </div>
+                <div class="candidate-info-inline">
+                  <div class="candidate-name-row">
+                    <span class="candidate-name" (click)="viewApplicantDetails(c)" title="View profile">{{ c.fullName }}</span>
+                    <span class="type-pill" [class.pill-intern]="c.candidateType === 'Intern'" [class.pill-emp]="c.candidateType === 'Employee'">
+                      {{ c.candidateType }}
+                    </span>
+                  </div>
+                  <span class="candidate-contact-inline">{{ c.email }} <ng-container *ngIf="c.phone">• {{ c.phone }}</ng-container></span>
+                </div>
+              </div>
+            </td>
+
+            <!-- 2. Role & Department (Single Line) -->
+            <td class="role-cell nowrap-cell">
+              <span class="role-title-inline">{{ c.role || 'Role' }}</span>
+              <span class="role-dept-inline" *ngIf="c.department">• {{ c.department }}</span>
+            </td>
+
+            <!-- 3. Interview Schedule (Single Line) -->
+            <td class="schedule-cell nowrap-cell">
+              <div class="schedule-inline">
+                <span class="schedule-badge" [ngClass]="getScheduleBadge(c.meetDate).class">
+                  {{ getScheduleBadge(c.meetDate).label }}
+                </span>
+                <span class="schedule-date-text">{{ c.meetDate | date:'mediumDate' }}</span>
+                <span class="schedule-time-text">{{ c.meetTime || '11:00 AM' }}</span>
+              </div>
+              <div *ngIf="c.rescheduleRequest?.status === 'pending'" class="reschedule-pending-tag" (click)="openRescheduleReviewModal(c, 'accept')" title="Click to review candidate's reschedule request">
+                <hugeicons-icon [icon]="ClockIcon" size="12" [strokeWidth]="2" color="#b45309"></hugeicons-icon>
+                <span>Reschedule Requested ({{ c.rescheduleRequest?.requestedDate | date:'shortDate' }})</span>
+              </div>
+            </td>
+
+            <!-- 4. Google Meet Link (Single Line) -->
+            <td class="meet-link-cell nowrap-cell">
+              <div class="meet-link-inline" *ngIf="c.meetLink">
+                <a [href]="c.meetLink" target="_blank" class="btn-join-meet-sm" title="Join Google Meet">
+                  <hugeicons-icon [icon]="VideoIcon" size="14" [strokeWidth]="1.8" color="#ffffff"></hugeicons-icon>
+                  <span>Join</span>
+                </a>
+                <button class="btn-copy-icon-sm" (click)="copyMeetLink(c.meetLink)" title="Copy Meet URL">
+                  <hugeicons-icon [icon]="CopyIcon" size="14" [strokeWidth]="1.6" color="#64748b"></hugeicons-icon>
+                </button>
+              </div>
+              <span class="text-muted text-xs" *ngIf="!c.meetLink">No link</span>
+            </td>
+
+            <!-- 5. Remarks (Single Line) -->
+            <td class="remarks-cell nowrap-cell">
+              <button class="remarks-chip-btn" (click)="openRemarksDrawer(c)" title="View/Add remarks">
+                <hugeicons-icon [icon]="CommentIcon" size="14" [strokeWidth]="1.6" color="#6366f1"></hugeicons-icon>
+                <span *ngIf="c.remarks && c.remarks.length > 0">{{ c.remarks.length }} {{ c.remarks.length === 1 ? 'Remark' : 'Remarks' }}</span>
+                <span *ngIf="!c.remarks || c.remarks.length === 0">+ Add Remark</span>
+              </button>
+            </td>
+
+            <!-- 6. Status (Single Line) -->
+            <td class="status-cell nowrap-cell">
+              <span class="status-pill status-{{ c.status }}">
+                {{ c.status | titlecase }}
+              </span>
+            </td>
+
+            <!-- 7. Actions (Single Line) -->
+            <td class="actions-cell nowrap-cell text-right">
+              <div class="action-buttons-inline">
+                <!-- If Active / Scheduled -->
+                <ng-container *ngIf="c.status === 'scheduled' || c.status === 'interviewed'">
+                  <button *ngIf="c.rescheduleRequest?.status === 'pending'" class="btn-action-reschedule-review" (click)="openRescheduleReviewModal(c, 'accept')" title="Review candidate's reschedule request">
+                    <hugeicons-icon [icon]="ClockIcon" size="13" [strokeWidth]="2" color="#b45309"></hugeicons-icon>
+                    <span>Review Request</span>
+                  </button>
+
+                  <button class="btn-action-primary-sm" (click)="openOnboardModal(c)" title="Approve & Onboard candidate">
+                    <hugeicons-icon [icon]="CheckIcon" size="14" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+                    <span>Onboard</span>
+                  </button>
+
+                  <button *ngIf="c.status === 'scheduled'" class="btn-action-interviewed-sm" (click)="markInterviewed(c)" title="Mark candidate as interviewed">
+                    <span>Mark as Interviewed</span>
+                  </button>
+
+                  <button class="btn-action-outline-sm" (click)="openRescheduleModal(c)" title="Reschedule Interview">
+                    <hugeicons-icon [icon]="CalendarIcon" size="14" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+                    <span>Reschedule</span>
+                  </button>
+
+                  <button class="btn-action-danger-sm" (click)="openRejectModal(c)" title="Reject Candidate">
+                    <hugeicons-icon [icon]="CancelIcon" size="14" [strokeWidth]="1.8" color="#ef4444"></hugeicons-icon>
+                  </button>
+                </ng-container>
+
+                <!-- If already Onboarded or Rejected -->
+                <ng-container *ngIf="c.status === 'onboarded' || c.status === 'rejected'">
+                  <button class="btn-action-view-sm" (click)="viewApplicantDetails(c)">
+                    <span>Profile</span>
+                  </button>
+                  <button class="btn-action-outline-sm" (click)="openRemarksDrawer(c)" title="View Remarks">
+                    <hugeicons-icon [icon]="CommentIcon" size="14" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+                  </button>
+                </ng-container>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- RIGHT: VERTICAL ACTION SIDEBAR -->
+  <app-employee-sidebar activeTab="shortlist"></app-employee-sidebar>
+</div>
+
+<!-- ==============================================================================
+     REMARKS TIMELINE DRAWER
+     ============================================================================== -->
+<div class="drawer-backdrop" *ngIf="showRemarksDrawer()" (click)="closeRemarksDrawer()">
+  <div class="drawer-panel" (click)="$event.stopPropagation()">
+    <!-- Drawer Header -->
+    <div class="drawer-header">
+      <div class="drawer-header-info">
+        <div class="drawer-title-row">
+          <hugeicons-icon [icon]="NoteIcon" size="18" [strokeWidth]="2" color="#2563eb"></hugeicons-icon>
+          <h3 class="drawer-title">Interview Remarks & Notes</h3>
+        </div>
+        <div class="drawer-candidate-meta">
+          <span class="candidate-meta-name">{{ selectedCandidate()?.fullName }}</span>
+          <span class="candidate-meta-divider">•</span>
+          <span class="candidate-meta-role">{{ selectedCandidate()?.role }}</span>
+          <span class="candidate-meta-badge" [class.badge-interviewed]="selectedCandidate()?.status === 'interviewed'">
+            {{ selectedCandidate()?.status === 'interviewed' ? 'Interviewed' : 'Scheduled' }}
+          </span>
+        </div>
+      </div>
+      <button class="btn-close-drawer" (click)="closeRemarksDrawer()" title="Close drawer">✕</button>
+    </div>
+
+    <!-- Minimalist Tabs Switcher -->
+    <div class="drawer-tabs-bar">
+      <button 
+        type="button" 
+        class="drawer-tab-btn" 
+        [class.active]="activeDrawerTab() === 'assessment'"
+        (click)="activeDrawerTab.set('assessment')">
+        <hugeicons-icon [icon]="NoteIcon" size="14" [strokeWidth]="1.8"></hugeicons-icon>
+        <span>Evaluation Form</span>
+      </button>
+      <button 
+        type="button" 
+        class="drawer-tab-btn" 
+        [class.active]="activeDrawerTab() === 'timeline'"
+        (click)="activeDrawerTab.set('timeline')">
+        <hugeicons-icon [icon]="CommentIcon" size="14" [strokeWidth]="1.8"></hugeicons-icon>
+        <span>Remarks Timeline ({{ selectedCandidate()?.remarks?.length || 0 }})</span>
+      </button>
+    </div>
+
+    <!-- TAB 1: MINIMALIST EVALUATION FORM -->
+    <div class="drawer-body minimal-form-body" *ngIf="activeDrawerTab() === 'assessment'">
+      <div class="form-section">
+        <!-- 1. Long-term Goal -->
+        <div class="form-row">
+          <label class="form-field-label">
+            <hugeicons-icon [icon]="TargetIcon" size="14" [strokeWidth]="1.8" color="#64748b"></hugeicons-icon>
+            <span>Long-term goal</span>
+          </label>
+          <textarea 
+            class="form-field-control form-textarea" 
+            rows="2" 
+            [(ngModel)]="evaluationForm.longTermGoal"></textarea>
+        </div>
+
+        <!-- 2. Expectations from the Company -->
+        <div class="form-row">
+          <label class="form-field-label">
+            <hugeicons-icon [icon]="BuildingIcon" size="14" [strokeWidth]="1.8" color="#64748b"></hugeicons-icon>
+            <span>Expectations from the company</span>
+          </label>
+          <textarea 
+            class="form-field-control form-textarea" 
+            rows="2" 
+            [(ngModel)]="evaluationForm.expectationsFromCompany"></textarea>
+        </div>
+
+        <!-- 3. Why were you not selected by previous companies? -->
+        <div class="form-row">
+          <label class="form-field-label">
+            <hugeicons-icon [icon]="HelpCircleIcon" size="14" [strokeWidth]="1.8" color="#64748b"></hugeicons-icon>
+            <span>Why were you not selected by previous companies?</span>
+          </label>
+          <textarea 
+            class="form-field-control form-textarea" 
+            rows="2" 
+            [(ngModel)]="evaluationForm.reasonNotSelectedPreviously"></textarea>
+        </div>
+
+        <!-- 4 & 5. Strengths & Concerns Grid -->
+        <div class="form-row-grid">
+          <!-- Strengths (Green Flags) -->
+          <div class="form-col">
+            <label class="form-field-label text-success">
+              <hugeicons-icon [icon]="FlagIcon" size="14" [strokeWidth]="2" color="#16a34a"></hugeicons-icon>
+              <span>Green flags (strengths)</span>
+            </label>
+            <textarea 
+              class="form-field-control form-textarea border-success-focus" 
+              rows="3" 
+              [(ngModel)]="evaluationForm.greenFlags"></textarea>
+          </div>
+
+          <!-- Concerns (Red Flags) -->
+          <div class="form-col">
+            <label class="form-field-label text-danger">
+              <hugeicons-icon [icon]="FlagIcon" size="14" [strokeWidth]="2" color="#dc2626"></hugeicons-icon>
+              <span>Red flags (weaknesses)</span>
+            </label>
+            <textarea 
+              class="form-field-control form-textarea border-danger-focus" 
+              rows="3" 
+              [(ngModel)]="evaluationForm.redFlags"></textarea>
+          </div>
+        </div>
+
+        <!-- 6. Bond -->
+        <div class="form-row">
+          <label class="form-field-label">
+            <hugeicons-icon [icon]="TaskIcon" size="14" [strokeWidth]="1.8" color="#64748b"></hugeicons-icon>
+            <span>Bond / service agreement</span>
+          </label>
+          <div class="segmented-control">
+            <button 
+              type="button" 
+              class="segment-btn" 
+              [class.active-segment]="evaluationForm.bond === 'Agree'"
+              (click)="evaluationForm.bond = 'Agree'">
+              Agree
+            </button>
+            <button 
+              type="button" 
+              class="segment-btn" 
+              [class.active-segment]="evaluationForm.bond === 'Disagree'"
+              (click)="evaluationForm.bond = 'Disagree'">
+              Disagree
+            </button>
+          </div>
+        </div>
+
+        <!-- 7. Startup Ideas in Next 2 Years -->
+        <div class="form-row">
+          <label class="form-field-label">
+            <hugeicons-icon [icon]="IdeaIcon" size="14" [strokeWidth]="1.8" color="#64748b"></hugeicons-icon>
+            <span>Do you have any startup ideas in the next 2 years?</span>
+          </label>
+          <div class="segmented-control">
+            <button 
+              type="button" 
+              class="segment-btn" 
+              [class.active-segment]="evaluationForm.startupIdeasNext2Years === 'Yes'"
+              (click)="evaluationForm.startupIdeasNext2Years = 'Yes'">
+              Yes
+            </button>
+            <button 
+              type="button" 
+              class="segment-btn" 
+              [class.active-segment]="evaluationForm.startupIdeasNext2Years === 'No'"
+              (click)="evaluationForm.startupIdeasNext2Years = 'No'">
+              No
+            </button>
+            <button 
+              type="button" 
+              class="segment-btn" 
+              [class.active-segment]="evaluationForm.startupIdeasNext2Years === 'Not at all'"
+              (click)="evaluationForm.startupIdeasNext2Years = 'Not at all'">
+              Not at all
+            </button>
+          </div>
+        </div>
+
+        <!-- 8. Location & Relocation -->
+        <div class="form-row">
+          <label class="form-field-label">
+            <hugeicons-icon [icon]="LocationIcon" size="14" [strokeWidth]="1.8" color="#64748b"></hugeicons-icon>
+            <span>Location and relocation</span>
+          </label>
+          <input 
+            type="text" 
+            class="form-field-control form-input" 
+            [(ngModel)]="evaluationForm.locationAndRelocation" />
+        </div>
+      </div>
+    </div>
+
+    <!-- Assessment Footer -->
+    <div class="drawer-footer" *ngIf="activeDrawerTab() === 'assessment'">
+      <div class="drawer-footer-actions">
+        <!-- Quick Status Toggle to Interviewed -->
+        <button 
+          *ngIf="selectedCandidate()?.status === 'scheduled'" 
+          type="button" 
+          class="btn-mark-interviewed" 
+          (click)="markInterviewed(selectedCandidate()!)">
+          Mark as Interviewed
+        </button>
+
+        <span 
+          *ngIf="selectedCandidate()?.status === 'interviewed'" 
+          class="status-interviewed-badge">
+          <hugeicons-icon [icon]="CheckIcon" size="14" [strokeWidth]="2" color="#16a34a"></hugeicons-icon>
+          <span>Interviewed</span>
+        </span>
+
+        <button 
+          type="button" 
+          class="btn-primary" 
+          [disabled]="isSavingEvaluation()" 
+          (click)="submitEvaluation()">
+          {{ isSavingEvaluation() ? 'Saving...' : 'Save Evaluation' }}
+        </button>
+      </div>
+    </div>
+
+    <!-- TAB 2: REMARKS TIMELINE & QUICK NOTE -->
+    <div class="drawer-body" *ngIf="activeDrawerTab() === 'timeline'">
+      <div class="remarks-timeline">
+        <div class="timeline-empty" *ngIf="!selectedCandidate()?.remarks || selectedCandidate()?.remarks?.length === 0">
+          <p>No remarks added yet. Add interview feedback below.</p>
+        </div>
+
+        <div class="timeline-item" *ngFor="let r of selectedCandidate()?.remarks">
+          <div class="timeline-dot"></div>
+          <div class="timeline-content-card">
+            <div class="timeline-meta">
+              <span class="author-name">{{ r.addedByName || 'HR Team' }}</span>
+              <span class="remark-time">{{ r.createdAt | date:'short' }}</span>
+            </div>
+            <p class="remark-text">{{ r.text }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Timeline Footer: Add Remark Input -->
+    <div class="drawer-footer" *ngIf="activeDrawerTab() === 'timeline'">
+      <textarea 
+        class="remark-input" 
+        rows="3" 
+        placeholder="Type interview feedback or internal evaluation note..."
+        [(ngModel)]="newRemarkText"></textarea>
+
+      <div class="drawer-footer-actions">
+        <!-- Quick Status Toggle to Interviewed -->
+        <button 
+          *ngIf="selectedCandidate()?.status === 'scheduled'" 
+          type="button" 
+          class="btn-mark-interviewed" 
+          (click)="markInterviewed(selectedCandidate()!)">
+          Mark as Interviewed
+        </button>
+
+        <span 
+          *ngIf="selectedCandidate()?.status === 'interviewed'" 
+          class="status-interviewed-badge">
+          <hugeicons-icon [icon]="CheckIcon" size="14" [strokeWidth]="2" color="#16a34a"></hugeicons-icon>
+          <span>Interviewed</span>
+        </span>
+
+        <button 
+          type="button" 
+          class="btn-primary" 
+          [disabled]="isAddingRemark() || !newRemarkText().trim()" 
+          (click)="addRemark()">
+          {{ isAddingRemark() ? 'Saving...' : 'Add Remark' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ==============================================================================
+     RESCHEDULE MODAL
+     ============================================================================== -->
+<div class="modal-backdrop" *ngIf="showRescheduleModal()" (click)="closeRescheduleModal()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Reschedule Interview Discussion</h3>
+        <p class="modal-subtitle">Update meet link, date, or timing for {{ rescheduleCandidate()?.fullName }}.</p>
+      </div>
+      <button class="btn-close-modal" (click)="closeRescheduleModal()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-row-2">
+        <div class="form-group">
+          <label class="form-label">Interview Date *</label>
+          <input 
+            type="date" 
+            [(ngModel)]="rescheduleForm.meetDate" 
+            (ngModelChange)="generateRescheduleEmail()" 
+            class="form-input" 
+            required />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Interview Time *</label>
+          <input 
+            type="text" 
+            [(ngModel)]="rescheduleForm.meetTime" 
+            (ngModelChange)="generateRescheduleEmail()" 
+            placeholder="e.g. 11:00 AM" 
+            class="form-input" 
+            required />
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Meeting Link / Platform URL *</label>
+        <input 
+          type="url" 
+          [(ngModel)]="rescheduleForm.meetLink" 
+          (ngModelChange)="generateRescheduleEmail()" 
+          placeholder="https://meet.google.com/xxx-yyyy-zzz" 
+          class="form-input" 
+          required />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Meeting Instructions / Notes</label>
+        <input 
+          type="text" 
+          [(ngModel)]="rescheduleForm.meetNotes" 
+          (ngModelChange)="generateRescheduleEmail()" 
+          placeholder="e.g. Please keep your laptop ready." 
+          class="form-input" />
+      </div>
+
+      <div class="form-group">
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="rescheduleForm.sendNotification" />
+          <span>Send automated interview reschedule email to candidate ({{ rescheduleCandidate()?.email }})</span>
+        </label>
+      </div>
+
+      <div class="form-group" *ngIf="rescheduleForm.sendNotification">
+        <label class="form-label">Email Notification Subject</label>
+        <input type="text" [(ngModel)]="rescheduleForm.emailSubject" class="form-input" />
+      </div>
+
+      <div class="form-group" *ngIf="rescheduleForm.sendNotification">
+        <label class="form-label">Email Body Preview</label>
+        <textarea [(ngModel)]="rescheduleForm.emailBody" rows="4" class="form-textarea"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" (click)="closeRescheduleModal()" [disabled]="isRescheduling()">Cancel</button>
+      <button type="button" class="btn-primary" (click)="submitReschedule()" [disabled]="isRescheduling() || !rescheduleForm.meetDate">
+        {{ isRescheduling() ? 'Updating...' : 'Save & Send Update' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==============================================================================
+     APPROVE & ONBOARD MODAL
+     ============================================================================== -->
+<div class="modal-backdrop" *ngIf="showOnboardModal()" (click)="closeOnboardModal()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Approve & Onboard Candidate</h3>
+        <p class="modal-subtitle">Generate official ID, allocate leave balance, and send welcome credentials.</p>
+      </div>
+      <button class="btn-close-modal" (click)="closeOnboardModal()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Candidate Summary Card -->
+      <div class="onboard-summary-box">
+        <div class="summary-name">{{ onboardCandidate()?.fullName }}</div>
+        <div class="summary-role">{{ onboardCandidate()?.role }} • {{ onboardCandidate()?.candidateType }}</div>
+        <div class="summary-contact">{{ onboardCandidate()?.email }} | {{ onboardCandidate()?.phone }}</div>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Official Joining / Onboarding Date *</label>
+        <input type="date" [(ngModel)]="onboardForm.onboardingDate" class="form-input" required />
+      </div>
+
+      <div class="checkboxes-row" *ngIf="onboardCandidate()?.candidateType === 'Employee'">
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="onboardForm.webAccess" />
+          <span>Enable Web Portal Access</span>
+        </label>
+        <label class="checkbox-label">
+          <input type="checkbox" [(ngModel)]="onboardForm.remoteAccess" />
+          <span>Enable Remote / Mobile Access</span>
+        </label>
+      </div>
+
+      <div class="info-alert">
+        <b>Automated Onboarding:</b> Confirming will generate a new unique 
+        {{ onboardCandidate()?.candidateType === 'Intern' ? 'Intern ID' : 'Employee ID' }}, 
+        initialize company leave counters, send the official welcome email, and move the candidate to the active team list.
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" (click)="closeOnboardModal()" [disabled]="isOnboarding()">Cancel</button>
+      <button type="button" class="btn-primary btn-onboard" (click)="submitOnboard()" [disabled]="isOnboarding() || !onboardForm.onboardingDate">
+        {{ isOnboarding() ? 'Processing Onboarding...' : 'Confirm & Onboard' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==============================================================================
+     REJECT CANDIDATE MODAL
+     ============================================================================== -->
+<div class="modal-backdrop" *ngIf="showRejectModal()" (click)="closeRejectModal()">
+  <div class="modal-dialog" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Reject Candidate</h3>
+        <p class="modal-subtitle">Send professional rejection email and update application record.</p>
+      </div>
+      <button class="btn-close-modal" (click)="closeRejectModal()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <div class="form-group">
+        <label class="form-label">Internal Reason for Rejection *</label>
+        <input type="text" [(ngModel)]="rejectForm.reason" class="form-input" required />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email Subject</label>
+        <input type="text" [(ngModel)]="rejectForm.emailSubject" class="form-input" />
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">Email Content Preview</label>
+        <textarea [(ngModel)]="rejectForm.emailBody" rows="5" class="form-textarea"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" (click)="closeRejectModal()" [disabled]="isRejecting()">Cancel</button>
+      <button type="button" class="btn-danger" (click)="submitReject()" [disabled]="isRejecting()">
+        {{ isRejecting() ? 'Rejecting...' : 'Confirm & Send Rejection' }}
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ==============================================================================
+     REVIEW RESCHEDULE REQUEST MODAL (Candidate-initiated request)
+     ============================================================================== -->
+<div class="modal-backdrop" *ngIf="showRescheduleReviewModal()" (click)="closeRescheduleReviewModal()">
+  <div class="modal-dialog modal-reschedule-review" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <div>
+        <h3 class="modal-title">Review Reschedule Request</h3>
+        <p class="modal-subtitle">Candidate requested an interview slot change.</p>
+      </div>
+      <button class="btn-close-modal" (click)="closeRescheduleReviewModal()">✕</button>
+    </div>
+
+    <div class="modal-body">
+      <!-- Candidate & Request Details -->
+      <div class="reschedule-comparison-card">
+        <div class="reschedule-side">
+          <span class="side-label">Current Interview</span>
+          <div class="side-value">
+            <strong>{{ rescheduleReviewCandidate()?.meetDate | date:'fullDate' }}</strong>
+            <span>{{ rescheduleReviewCandidate()?.meetTime || '11:00 AM' }}</span>
+          </div>
+        </div>
+
+        <div class="reschedule-divider-arrow">➔</div>
+
+        <div class="reschedule-side requested-side">
+          <span class="side-label">Candidate Requested</span>
+          <div class="side-value">
+            <strong>{{ (rescheduleReviewCandidate()?.rescheduleRequest?.requestedDate | date:'fullDate') || 'Any flexible date' }}</strong>
+            <span>{{ rescheduleReviewCandidate()?.rescheduleRequest?.requestedTime || 'Any time' }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="candidate-reason-box" *ngIf="rescheduleReviewCandidate()?.rescheduleRequest?.reason">
+        <span class="reason-label">Reason provided by candidate:</span>
+        <p class="reason-text">"{{ rescheduleReviewCandidate()?.rescheduleRequest?.reason }}"</p>
+      </div>
+
+      <!-- Action Choice Tabs (Accept & Reschedule vs Decline) -->
+      <div class="reschedule-action-toggle">
+        <button 
+          type="button" 
+          class="reschedule-toggle-btn" 
+          [class.active-accept]="rescheduleReviewAction() === 'accept'" 
+          (click)="rescheduleReviewAction.set('accept')">
+          <hugeicons-icon [icon]="CheckIcon" size="14" [strokeWidth]="2"></hugeicons-icon>
+          <span>Accept & Reschedule</span>
+        </button>
+        <button 
+          type="button" 
+          class="reschedule-toggle-btn" 
+          [class.active-decline]="rescheduleReviewAction() === 'decline'" 
+          (click)="rescheduleReviewAction.set('decline')">
+          <hugeicons-icon [icon]="CancelIcon" size="14" [strokeWidth]="2"></hugeicons-icon>
+          <span>Decline Request</span>
+        </button>
+      </div>
+
+      <!-- Form for Accept -->
+      <div *ngIf="rescheduleReviewAction() === 'accept'" class="reschedule-edit-fields">
+        <div class="form-row-2col">
+          <div class="form-group">
+            <label class="form-label">Confirmed Date *</label>
+            <input type="date" [(ngModel)]="rescheduleReviewForm.meetDate" class="form-input" required />
+          </div>
+          <div class="form-group">
+            <label class="form-label">Confirmed Time *</label>
+            <input type="text" [(ngModel)]="rescheduleReviewForm.meetTime" placeholder="e.g. 11:30 AM" class="form-input" required />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Meeting Link (Google Meet)</label>
+          <input type="url" [(ngModel)]="rescheduleReviewForm.meetLink" placeholder="https://meet.google.com/..." class="form-input" />
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Note to Candidate (Optional)</label>
+          <textarea [(ngModel)]="rescheduleReviewForm.adminNotes" rows="2" class="form-textarea" placeholder="Any additional notes or instructions for the updated slot..."></textarea>
+        </div>
+
+        <div class="info-alert">
+          <b>Notification:</b> An updated meeting confirmation email will be automatically sent to <b>{{ rescheduleReviewCandidate()?.email }}</b>.
+        </div>
+      </div>
+
+      <!-- Form for Decline -->
+      <div *ngIf="rescheduleReviewAction() === 'decline'" class="reschedule-decline-fields">
+        <div class="warning-alert">
+          <b>Notice:</b> The existing interview slot on <b>{{ rescheduleReviewCandidate()?.meetDate | date:'mediumDate' }} at {{ rescheduleReviewCandidate()?.meetTime }}</b> will be retained.
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Reason for declining / Note to candidate</label>
+          <textarea [(ngModel)]="rescheduleReviewForm.adminNotes" rows="3" class="form-textarea" placeholder="e.g. Due to interview panel availability, we are unable to accommodate this time slot. Please attend as originally scheduled..."></textarea>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-footer">
+      <button type="button" class="btn-cancel" (click)="closeRescheduleReviewModal()" [disabled]="isRespondingReschedule()">Cancel</button>
+
+      <button 
+        *ngIf="rescheduleReviewAction() === 'accept'"
+        type="button" 
+        class="btn-primary" 
+        (click)="submitRescheduleResponse()" 
+        [disabled]="isRespondingReschedule() || !rescheduleReviewForm.meetDate || !rescheduleReviewForm.meetTime">
+        {{ isRespondingReschedule() ? 'Updating...' : 'Accept & Update Schedule' }}
+      </button>
+
+      <button 
+        *ngIf="rescheduleReviewAction() === 'decline'"
+        type="button" 
+        class="btn-danger" 
+        (click)="submitRescheduleResponse()" 
+        [disabled]="isRespondingReschedule()">
+        {{ isRespondingReschedule() ? 'Declining...' : 'Decline Request' }}
+      </button>
+    </div>
+  </div>
+</div>

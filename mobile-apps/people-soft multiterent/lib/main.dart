@@ -48,6 +48,30 @@ class MainApp extends StatelessWidget {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF00657F)),
+        progressIndicatorTheme: const ProgressIndicatorThemeData(
+          color: Color(0xFF00657F),
+        ),
+        inputDecorationTheme: const InputDecorationTheme(
+          labelStyle: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.normal,
+            color: Color(0xFF64748B),
+          ),
+          floatingLabelStyle: TextStyle(
+            fontSize: 13,
+            fontWeight: FontWeight.normal,
+            color: Color(0xFF008C9E),
+          ),
+          hintStyle: TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.normal,
+            color: Color(0xFF94A3B8),
+          ),
+        ),
+      ),
       home: SplashScreen(
         hrLoggedIn: hrLoggedIn,
         initialInternId: initialInternId,

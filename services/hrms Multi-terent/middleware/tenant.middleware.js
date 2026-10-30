@@ -1,5 +1,5 @@
 const jwt = require('jsonwebtoken');
-const { getMasterConnection, getTenantConnection } = require('../db');
+const { getMasterConnection, getTenantConnection, waitForConnection } = require('../db');
 const { getModelsForConnection } = require('../utilities/modelLoader');
 // We load Company schema from the master connection manually for auth/middleware lookups
 const CompanyModelExport = require('../models/CompanyModel');
@@ -24,7 +24,10 @@ function _setCachedCompany(companyId, data) {
 
 const verifyTenant = async (req, res, next) => {
   try {
-    const authHeader = req.header('Authorization');
+    let authHeader = req.header('Authorization');
+    if ((!authHeader || !authHeader.startsWith('Bearer ')) && req.query.token) {
+      authHeader = `Bearer ${req.query.token}`;
+    }
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
       return res.status(401).json({ msg: 'No token, authorization denied' });
     }
@@ -46,7 +49,9 @@ const verifyTenant = async (req, res, next) => {
     console.log(`[Tenant] URL: ${req.url} | User: ${decoded.user.id} | dbName from token: ${decoded.user.dbName} | Final DB: ${dbName}`);
     
     // Connect to specific tenant DB and attach models
+    // waitForConnection ensures the pool is ready — avoids silent hangs on cold start
     const tenantDbConnection = getTenantConnection(dbName);
+    if (tenantDbConnection.readyState !== 1) await waitForConnection(tenantDbConnection);
     req.models = getModelsForConnection(tenantDbConnection);
 
     // Verify company exists in Master DB if companyId is present
@@ -72,7 +77,14 @@ const verifyTenant = async (req, res, next) => {
       if (!companyData) {
         const masterDbConnection = getMasterConnection();
         const MasterCompany = masterDbConnection.models.Company || masterDbConnection.model('Company', CompanyModelExport.schema);
-        companyData = await MasterCompany.findById(targetCompanyId);
+        // ✅ Projection: only fetch the 5 fields we use — avoids loading the full 2.38MB company doc on every authenticated request
+        companyData = await MasterCompany.findById(targetCompanyId, {
+          companyCode: 1,
+          dbName: 1,
+          'settings.receivingEmail': 1,
+          'settings.defaultPassword': 1,
+          'settings.communication.emailLogoUrl': 1
+        }).lean();
         if (companyData) _setCachedCompany(cacheKey, companyData);
       }
       
@@ -104,3 +116,15 @@ const verifyTenant = async (req, res, next) => {
 
 module.exports = verifyTenant;
 
+/**
+ * Pre-warm the authenticated company cache at server startup.
+ * Call once after Master DB connects with the lean company list.
+ * Eliminates the cold-start Atlas round-trip on the first authenticated request.
+ * @param {Array} companies - lean company objects with _id, companyCode, dbName, settings.*
+ */
+module.exports.warmTenantCache = (companies) => {
+  if (!Array.isArray(companies)) return;
+  companies.forEach(c => {
+    if (c._id) _setCachedCompany(c._id.toString(), c);
+  });
+};

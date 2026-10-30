@@ -1,0 +1,30 @@
+{
+  "name": "softrate-lms-service",
+  "version": "1.0.0",
+  "description": "Softrate LMS Express & Node.js Backend Service",
+  "main": "src/server.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20 <24",
+    "npm": ">=10"
+  },
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test": "node --test"
+  },
+  "keywords": [
+    "softrate",
+    "lms",
+    "express",
+    "nodejs"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2"
+  }
+}
+

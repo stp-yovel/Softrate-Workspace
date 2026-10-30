@@ -138,7 +138,7 @@ export class ApiService {
   getDashboardStats(): Observable<any> {
     return forkJoin({
       activeInterns: this.http.get<any[]>(this.addCacheBuster(`${this.baseUrl}/api/intern/all/active`), { headers: this.getHeaders() }),
-      initialInterns: this.http.get<any[]>(this.addCacheBuster(`${this.baseUrl}/api/intern/all/initial`), { headers: this.getHeaders() }),
+      initialInterns: this.http.get<any[]>(this.addCacheBuster(`${this.baseUrl}/api/intern/all/initial?limit=4`), { headers: this.getHeaders() }),
       activeEmployees: this.http.get<any[]>(this.addCacheBuster(`${this.baseUrl}/api/employee/all/active`), { headers: this.getHeaders() }),
       internAttendance: this.http.get<any>(this.addCacheBuster(`${this.baseUrl}/api/attendance/today/all`), { headers: this.getHeaders() }).pipe(
         map(res => {
@@ -457,6 +457,13 @@ export class ApiService {
     return this.http.put(`${this.baseUrl}/api/intern/update/${id}`, data);
   }
 
+  downloadPayslipPdf(employeeId: string, month: string): Observable<Blob> {
+    const encodedMonth = encodeURIComponent(month);
+    return this.http.get(`${this.baseUrl}/api/payroll/payslip-pdf/${employeeId}?month=${encodedMonth}`, {
+      responseType: 'blob'
+    });
+  }
+
   // Attendance
   getInternAttendance(internId: string): Observable<any[]> {
     return this.http.get<any[]>(`${this.baseUrl}/api/attendance/intern/${internId}`);
@@ -599,17 +606,61 @@ export class ApiService {
   acceptIntern(id: string, data: any): Observable<any> {
     return this.http.put(`${this.baseUrl}/api/intern/accept/${id}`, data);
   }
+  shortlistIntern(id: string, data: any): Observable<any> {
+    return this.http.put(`${this.baseUrl}/api/intern/shortlist/${id}`, data);
+  }
   resendOnboardingMail(id: string): Observable<any> {
     return this.http.post(`${this.baseUrl}/api/intern/resend-onboarding/${id}`, {});
   }
   deleteIntern(id: string): Observable<any> {
     return this.http.put(`${this.baseUrl}/api/intern/reject/${id}`, {});
   }
+  rejectIntern(id: string, data?: any): Observable<any> {
+    return this.http.put(`${this.baseUrl}/api/intern/reject/${id}`, data || {});
+  }
   deleteEmployee(id: string): Observable<any> {
-    return this.http.delete(`${this.baseUrl}/api/employee/reject/${id}`);
+    return this.http.put(`${this.baseUrl}/api/employee/reject/${id}`, {});
+  }
+  rejectEmployee(id: string, data?: any): Observable<any> {
+    return this.http.put(`${this.baseUrl}/api/employee/reject/${id}`, data || {});
   }
   acceptEmployee(id: string, data: any): Observable<any> {
     return this.http.put(`${this.baseUrl}/api/employee/accept/${id}`, data);
+  }
+  shortlistEmployee(id: string, data: any): Observable<any> {
+    return this.http.put(`${this.baseUrl}/api/employee/shortlist/${id}`, data);
+  }
+
+  // ── Shortlisting Management System ──────────────────────────────────────────
+  getShortlistedCandidates(params?: any): Observable<any> {
+    return this.http.get(`${this.baseUrl}/api/shortlist`, { params });
+  }
+  createShortlistEntry(data: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/shortlist`, data);
+  }
+  getShortlistById(id: string): Observable<any> {
+    return this.http.get(`${this.baseUrl}/api/shortlist/${id}`);
+  }
+  rescheduleShortlist(id: string, data: any): Observable<any> {
+    return this.http.patch(`${this.baseUrl}/api/shortlist/${id}/schedule`, data);
+  }
+  respondToRescheduleRequest(id: string, data: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/shortlist/${id}/reschedule-respond`, data);
+  }
+  addShortlistRemark(id: string, text: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/shortlist/${id}/remarks`, { text });
+  }
+  saveShortlistEvaluation(id: string, evaluation: any): Observable<any> {
+    return this.http.put(`${this.baseUrl}/api/shortlist/${id}/evaluation`, evaluation);
+  }
+  updateShortlistStatus(id: string, status: string, remark?: string): Observable<any> {
+    return this.http.patch(`${this.baseUrl}/api/shortlist/${id}/status`, { status, remark });
+  }
+  onboardShortlistCandidate(id: string, data: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/shortlist/${id}/onboard`, data);
+  }
+  rejectShortlistCandidate(id: string, data: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/shortlist/${id}/reject`, data);
   }
 
   // Manager Assignment & Review
@@ -672,6 +723,11 @@ export class ApiService {
   // Company Settings
   getCompanySettings(): Observable<any> {
     return this.http.get<any>(this.addCacheBuster(`${this.baseUrl}/api/settings/company`), { headers: this.getHeaders() });
+  }
+
+  /** Lazily fetch the 2.2MB offer letter / certificate templates (only when certificate settings tab opens) */
+  getOfferLetterSettings(): Observable<any> {
+    return this.http.get<any>(this.addCacheBuster(`${this.baseUrl}/api/settings/offer-letter-settings`), { headers: this.getHeaders() });
   }
 
   updateCompanySettings(settings: any): Observable<any> {
@@ -937,5 +993,110 @@ export class ApiService {
 
   updateWalkinApplicationStatus(applicationId: string, status: string): Observable<any> {
     return this.http.patch(`${this.baseUrl}/api/walkin-drives/applications/${applicationId}/status`, { status }, { headers: this.getHeaders() });
+  }
+
+  // Campus Hiring
+  getColleges(): Observable<any[]> {
+    return this.http.get<any[]>(this.addCacheBuster(`${this.baseUrl}/api/campus-hiring/colleges`), { headers: this.getHeaders() });
+  }
+
+  createCollege(formData: FormData): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/campus-hiring/colleges`, formData, { headers: this.getHeaders() });
+  }
+
+  updateCollege(id: string, formData: FormData): Observable<any> {
+    return this.http.put(`${this.baseUrl}/api/campus-hiring/colleges/${id}`, formData, { headers: this.getHeaders() });
+  }
+
+  getCollegeById(id: string): Observable<any> {
+    return this.http.get<any>(this.addCacheBuster(`${this.baseUrl}/api/campus-hiring/colleges/${id}`), { headers: this.getHeaders() });
+  }
+
+  downloadCollegeMou(id: string): Observable<Blob> {
+    return this.http.get(`${this.baseUrl}/api/campus-hiring/colleges/${id}/mou-download`, {
+      headers: this.getHeaders(),
+      responseType: 'blob'
+    });
+  }
+
+  downloadCollegeMouUrl(id: string): string {
+    const token = localStorage.getItem('auth_token') || '';
+    const companyCode = localStorage.getItem('company_code') || '';
+    return `${this.baseUrl}/api/campus-hiring/colleges/${id}/mou-download?token=${encodeURIComponent(token)}&companyCode=${encodeURIComponent(companyCode)}`;
+  }
+
+  addAcademicYear(collegeId: string, payload: { year: string, startDate?: string, endDate?: string, notes?: string }): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/campus-hiring/colleges/${collegeId}/academic-years`, payload, { headers: this.getHeaders() });
+  }
+
+  createCampusDrive(driveData: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/campus-hiring/drives`, driveData, { headers: this.getHeaders() });
+  }
+
+  getCampusDrives(collegeId?: string, academicYear?: string): Observable<any[]> {
+    let url = `${this.baseUrl}/api/campus-hiring/drives`;
+    const params: string[] = [];
+    if (collegeId) params.push(`collegeId=${encodeURIComponent(collegeId)}`);
+    if (academicYear) params.push(`academicYear=${encodeURIComponent(academicYear)}`);
+    if (params.length > 0) url += `?${params.join('&')}`;
+    return this.http.get<any[]>(this.addCacheBuster(url), { headers: this.getHeaders() });
+  }
+
+  getCampusDriveById(driveId: string): Observable<any> {
+    return this.http.get<any>(this.addCacheBuster(`${this.baseUrl}/api/campus-hiring/drives/${driveId}`), { headers: this.getHeaders() });
+  }
+
+  importCampusStudents(driveId: string, students: any[], conflictResolution: 'skip' | 'update' = 'skip'): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/campus-hiring/drives/${driveId}/import-students`, { students, conflictResolution }, { headers: this.getHeaders() });
+  }
+
+  getCampusStudents(driveId: string, params?: { roundOrder?: string | number, status?: string, search?: string }): Observable<any[]> {
+    let url = `${this.baseUrl}/api/campus-hiring/drives/${driveId}/students`;
+    const q: string[] = [];
+    if (params?.roundOrder !== undefined) q.push(`roundOrder=${params.roundOrder}`);
+    if (params?.status) q.push(`status=${params.status}`);
+    if (params?.search) q.push(`search=${encodeURIComponent(params.search)}`);
+    if (q.length > 0) url += `?${q.join('&')}`;
+    return this.http.get<any[]>(this.addCacheBuster(url), { headers: this.getHeaders() });
+  }
+
+  updateStudentRoundStatus(studentId: string, payload: { action: 'clear_and_promote' | 'reject' | 'mark_selected', remarks?: string, score?: number }): Observable<any> {
+    return this.http.patch(`${this.baseUrl}/api/campus-hiring/students/${studentId}/round-status`, payload, { headers: this.getHeaders() });
+  }
+
+  submitCampusStudentProfile(payload: any): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/campus-hiring/public/student-submit`, payload);
+  }
+
+  onboardCampusStudentAsIntern(studentId: string): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/campus-hiring/students/${studentId}/onboard-intern`, {}, { headers: this.getHeaders() });
+  }
+
+  bulkOnboardCampusStudentsAsIntern(studentIds: string[]): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/campus-hiring/students/bulk-onboard`, { studentIds }, { headers: this.getHeaders() });
+  }
+
+  bulkUpdateCampusStudents(payload: { studentIds: string[], action: 'clear_and_promote' | 'reject', remarks?: string }): Observable<any> {
+    return this.http.post(`${this.baseUrl}/api/campus-hiring/students/bulk-update`, payload, { headers: this.getHeaders() });
+  }
+
+  getHireProExams(): Observable<any> {
+    return this.http.get<any>(this.addCacheBuster(`${this.baseUrl}/api/campus-hiring/hirepro/exams`), { headers: this.getHeaders() });
+  }
+
+  getLMSCourses(): Observable<any> {
+    return this.http.get<any>(this.addCacheBuster(`${this.baseUrl}/api/lms/courses`), { headers: this.getHeaders() });
+  }
+
+  createLMSCourse(payload: any): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/api/lms/courses`, payload, { headers: this.getHeaders() });
+  }
+
+  assignLMSCourse(payload: { courseId: string; userId: string; userType: string; userEmail?: string; userName?: string }): Observable<any> {
+    return this.http.post<any>(`${this.baseUrl}/api/lms/assign`, payload, { headers: this.getHeaders() });
+  }
+
+  getUserLMSCourses(userId: string): Observable<any> {
+    return this.http.get<any>(this.addCacheBuster(`${this.baseUrl}/api/lms/user/${userId}`), { headers: this.getHeaders() });
   }
 }

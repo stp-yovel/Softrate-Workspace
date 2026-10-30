@@ -6,91 +6,547 @@
       </a>
     </div>
     <h1>Pending Employee Requests</h1>
-    <p>Review and onboard new employee applications.</p>
+    <p>Review, filter, and onboard applicant registrations with role & assessment insights.</p>
   </div>
-</div>
 
-<div class="data-container" [class.loading]="isLoading()">
-  <div class="search-sort-group" style="display: flex; gap: 0.75rem; align-items: center; justify-content: flex-end; padding: 1rem 1.5rem; background: white; border-bottom: 1px solid var(--border-color);">
-    <div style="position: relative; width: 280px;">
-      <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 13px;"></i>
-      <input type="text" placeholder="Search by name, role..." (input)="onSearch($event)" style="padding: 0.4rem 0.875rem 0.4rem 32px; border: 1px solid var(--border-color); border-radius: 8px; outline: none; background: var(--hc-bg); font-size: 13px; width: 100%; height: 38px; box-sizing: border-box;">
+  <div class="search-sort-group">
+    <!-- Search Box -->
+    <div class="tab-search">
+      <i class="fa-solid fa-magnifying-glass"></i>
+      <input type="text" [ngModel]="searchQuery()" (input)="onSearch($event)"
+        placeholder="Search name, role, college, email...">
+      <button *ngIf="searchQuery()" type="button" class="btn-clear-inline" (click)="clearSingleFilter('search')"
+        title="Clear search">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
     </div>
-    <select [value]="sortFilter()" (change)="setSort($any($event.target).value)" style="border: 1px solid var(--border-color); border-radius: 8px; padding: 0.4rem 0.875rem; outline: none; background: white; font-size: 13px; color: var(--text-secondary); cursor: pointer; height: 38px;">
+
+    <!-- Advanced Filters Toggle -->
+    <button type="button" class="btn-filter-toggle" [class.active]="isFilterPanelOpen() || activeFilterCount() > 0"
+      (click)="toggleFilterPanel()">
+      <i class="fa-solid fa-sliders"></i>
+      <span>Filters</span>
+      <span class="filter-count-badge" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }}</span>
+    </button>
+
+    <!-- Sort Dropdown -->
+    <select [ngModel]="sortFilter()" (ngModelChange)="setSort($event)" class="select-sort">
       <option value="recent">Newest to Oldest</option>
       <option value="oldest">Oldest to Newest</option>
       <option value="az">Alphabetical (A-Z)</option>
       <option value="za">Alphabetical (Z-A)</option>
     </select>
   </div>
+</div>
 
+<!-- Expandable Advanced Multi-Dimensional Filter Drawer -->
+<div class="advanced-filter-drawer" *ngIf="isFilterPanelOpen()">
+  <div class="filter-drawer-header">
+    <div class="drawer-title">
+      <h3>Advanced Filters</h3>
+      <span class="active-badge" *ngIf="activeFilterCount() > 0">{{ activeFilterCount() }} active</span>
+    </div>
+    <div class="drawer-actions">
+      <button type="button" class="btn-drawer-reset" (click)="resetAllFilters()" [disabled]="activeFilterCount() === 0">
+        <i class="fa-solid fa-rotate-left"></i> Reset All
+      </button>
+      <button type="button" class="btn-drawer-close" (click)="toggleFilterPanel()">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+  </div>
+
+  <div class="filter-grid">
+    <!-- 1. Designation / Role -->
+    <div class="filter-field">
+      <label>Designation / Role</label>
+      <div class="custom-multiselect" (click)="$event.stopPropagation()">
+        <button type="button" class="custom-multiselect-trigger" [class.active]="isDropdownOpen('role')" (click)="toggleDropdown('role', $event)">
+          <span class="custom-multiselect-label">{{ getRoleFilterDisplayText() }}</span>
+          <i class="fa-solid fa-chevron-down multiselect-chevron" [class.rotated]="isDropdownOpen('role')"></i>
+        </button>
+        <div class="custom-multiselect-dropdown" *ngIf="isDropdownOpen('role')">
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(roleFilter(), 'all')" (click)="toggleOptionInList(roleFilter, 'all', $event)">
+            <input type="checkbox" [checked]="isItemSelected(roleFilter(), 'all')" (click)="$event.stopPropagation(); toggleOptionInList(roleFilter, 'all', $event)">
+            <span>All Roles</span>
+          </div>
+          <div class="custom-multiselect-divider" *ngIf="roles().length > 0"></div>
+          <div class="custom-multiselect-item" *ngFor="let r of roles()" [class.selected]="isItemSelected(roleFilter(), r)" (click)="toggleOptionInList(roleFilter, r, $event)">
+            <input type="checkbox" [checked]="isItemSelected(roleFilter(), r)" (click)="$event.stopPropagation(); toggleOptionInList(roleFilter, r, $event)">
+            <span>{{ r }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 2. Experience Level (Multi-Select) -->
+    <div class="filter-field">
+      <label>Experience Level</label>
+      <div class="custom-multiselect" (click)="$event.stopPropagation()">
+        <button type="button" class="custom-multiselect-trigger" [class.active]="isDropdownOpen('exp')" (click)="toggleDropdown('exp', $event)">
+          <span class="custom-multiselect-label">{{ getExpFilterDisplayText() }}</span>
+          <i class="fa-solid fa-chevron-down multiselect-chevron" [class.rotated]="isDropdownOpen('exp')"></i>
+        </button>
+        <div class="custom-multiselect-dropdown" *ngIf="isDropdownOpen('exp')">
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(experienceFilter(), 'all')" (click)="toggleOptionInList(experienceFilter, 'all', $event)">
+            <input type="checkbox" [checked]="isItemSelected(experienceFilter(), 'all')" (click)="$event.stopPropagation(); toggleOptionInList(experienceFilter, 'all', $event)">
+            <span>All Experience Levels</span>
+          </div>
+          <div class="custom-multiselect-divider"></div>
+          <div class="custom-multiselect-item" *ngFor="let opt of experienceOptions" [class.selected]="isItemSelected(experienceFilter(), opt.value)" (click)="toggleOptionInList(experienceFilter, opt.value, $event)">
+            <input type="checkbox" [checked]="isItemSelected(experienceFilter(), opt.value)" (click)="$event.stopPropagation(); toggleOptionInList(experienceFilter, opt.value, $event)">
+            <span>{{ opt.label }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. Degree / Qualification -->
+    <div class="filter-field">
+      <label>Degree / Qualification</label>
+      <div class="custom-multiselect" (click)="$event.stopPropagation()">
+        <button type="button" class="custom-multiselect-trigger" [class.active]="isDropdownOpen('degree')" (click)="toggleDropdown('degree', $event)">
+          <span class="custom-multiselect-label">{{ getDegreeFilterDisplayText() }}</span>
+          <i class="fa-solid fa-chevron-down multiselect-chevron" [class.rotated]="isDropdownOpen('degree')"></i>
+        </button>
+        <div class="custom-multiselect-dropdown" *ngIf="isDropdownOpen('degree')">
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(degreeFilter(), 'all')" (click)="toggleOptionInList(degreeFilter, 'all', $event)">
+            <input type="checkbox" [checked]="isItemSelected(degreeFilter(), 'all')" (click)="$event.stopPropagation(); toggleOptionInList(degreeFilter, 'all', $event)">
+            <span>All Degrees</span>
+          </div>
+          <div class="custom-multiselect-divider"></div>
+          <div class="custom-multiselect-item" *ngFor="let deg of degreeOptions" [class.selected]="isItemSelected(degreeFilter(), deg)" (click)="toggleOptionInList(degreeFilter, deg, $event)">
+            <input type="checkbox" [checked]="isItemSelected(degreeFilter(), deg)" (click)="$event.stopPropagation(); toggleOptionInList(degreeFilter, deg, $event)">
+            <span>{{ deg }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4. Batch / Passing Year -->
+    <div class="filter-field">
+      <label>Batch / Passing Year</label>
+      <div class="custom-multiselect" (click)="$event.stopPropagation()">
+        <button type="button" class="custom-multiselect-trigger" [class.active]="isDropdownOpen('year')" (click)="toggleDropdown('year', $event)">
+          <span class="custom-multiselect-label">{{ getYearFilterDisplayText() }}</span>
+          <i class="fa-solid fa-chevron-down multiselect-chevron" [class.rotated]="isDropdownOpen('year')"></i>
+        </button>
+        <div class="custom-multiselect-dropdown" *ngIf="isDropdownOpen('year')">
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(yearFilter(), 'all')" (click)="toggleOptionInList(yearFilter, 'all', $event)">
+            <input type="checkbox" [checked]="isItemSelected(yearFilter(), 'all')" (click)="$event.stopPropagation(); toggleOptionInList(yearFilter, 'all', $event)">
+            <span>All Batches / Years</span>
+          </div>
+          <div class="custom-multiselect-divider"></div>
+          <div class="custom-multiselect-item" *ngFor="let yr of yearOptions" [class.selected]="isItemSelected(yearFilter(), yr)" (click)="toggleOptionInList(yearFilter, yr, $event)">
+            <input type="checkbox" [checked]="isItemSelected(yearFilter(), yr)" (click)="$event.stopPropagation(); toggleOptionInList(yearFilter, yr, $event)">
+            <span>{{ yr }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 5. Assessment Status -->
+    <div class="filter-field">
+      <label>Assessment Submission</label>
+      <div class="custom-multiselect" (click)="$event.stopPropagation()">
+        <button type="button" class="custom-multiselect-trigger" [class.active]="isDropdownOpen('assessment')" (click)="toggleDropdown('assessment', $event)">
+          <span class="custom-multiselect-label">{{ getAssessmentFilterDisplayText() }}</span>
+          <i class="fa-solid fa-chevron-down multiselect-chevron" [class.rotated]="isDropdownOpen('assessment')"></i>
+        </button>
+        <div class="custom-multiselect-dropdown" *ngIf="isDropdownOpen('assessment')">
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(assessmentFilter(), 'all')" (click)="toggleOptionInList(assessmentFilter, 'all', $event)">
+            <input type="checkbox" [checked]="isItemSelected(assessmentFilter(), 'all')" (click)="$event.stopPropagation(); toggleOptionInList(assessmentFilter, 'all', $event)">
+            <span>All Assessment Statuses</span>
+          </div>
+          <div class="custom-multiselect-divider"></div>
+          <div class="custom-multiselect-item" *ngFor="let ass of assessmentOptions" [class.selected]="isItemSelected(assessmentFilter(), ass.value)" (click)="toggleOptionInList(assessmentFilter, ass.value, $event)">
+            <input type="checkbox" [checked]="isItemSelected(assessmentFilter(), ass.value)" (click)="$event.stopPropagation(); toggleOptionInList(assessmentFilter, ass.value, $event)">
+            <span>{{ ass.label }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 6. Assigned Manager -->
+    <div class="filter-field">
+      <label>Manager Assignment</label>
+      <div class="custom-multiselect" (click)="$event.stopPropagation()">
+        <button type="button" class="custom-multiselect-trigger" [class.active]="isDropdownOpen('manager')" (click)="toggleDropdown('manager', $event)">
+          <span class="custom-multiselect-label">{{ getManagerFilterDisplayText() }}</span>
+          <i class="fa-solid fa-chevron-down multiselect-chevron" [class.rotated]="isDropdownOpen('manager')"></i>
+        </button>
+        <div class="custom-multiselect-dropdown" *ngIf="isDropdownOpen('manager')">
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(managerFilter(), 'all')" (click)="toggleOptionInList(managerFilter, 'all', $event)">
+            <input type="checkbox" [checked]="isItemSelected(managerFilter(), 'all')" (click)="$event.stopPropagation(); toggleOptionInList(managerFilter, 'all', $event)">
+            <span>All Assignment Statuses</span>
+          </div>
+          <div class="custom-multiselect-divider"></div>
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(managerFilter(), 'unassigned')" (click)="toggleOptionInList(managerFilter, 'unassigned', $event)">
+            <input type="checkbox" [checked]="isItemSelected(managerFilter(), 'unassigned')" (click)="$event.stopPropagation(); toggleOptionInList(managerFilter, 'unassigned', $event)">
+            <span>Unassigned (Needs Manager)</span>
+          </div>
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(managerFilter(), 'assigned')" (click)="toggleOptionInList(managerFilter, 'assigned', $event)">
+            <input type="checkbox" [checked]="isItemSelected(managerFilter(), 'assigned')" (click)="$event.stopPropagation(); toggleOptionInList(managerFilter, 'assigned', $event)">
+            <span>Assigned (Any Manager)</span>
+          </div>
+          <div class="custom-multiselect-divider" *ngIf="managers().length > 0"></div>
+          <div class="custom-multiselect-item" *ngFor="let m of managers()" [class.selected]="isItemSelected(managerFilter(), m._id)" (click)="toggleOptionInList(managerFilter, m._id, $event)">
+            <input type="checkbox" [checked]="isItemSelected(managerFilter(), m._id)" (click)="$event.stopPropagation(); toggleOptionInList(managerFilter, m._id, $event)">
+            <span>{{ m.fullName }}{{ m.department ? ' (' + m.department + ')' : '' }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 7. Notice Period -->
+    <div class="filter-field">
+      <label>Notice Period</label>
+      <div class="custom-multiselect" (click)="$event.stopPropagation()">
+        <button type="button" class="custom-multiselect-trigger" [class.active]="isDropdownOpen('notice')" (click)="toggleDropdown('notice', $event)">
+          <span class="custom-multiselect-label">{{ getNoticePeriodFilterDisplayText() }}</span>
+          <i class="fa-solid fa-chevron-down multiselect-chevron" [class.rotated]="isDropdownOpen('notice')"></i>
+        </button>
+        <div class="custom-multiselect-dropdown" *ngIf="isDropdownOpen('notice')">
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(noticePeriodFilter(), 'all')" (click)="toggleOptionInList(noticePeriodFilter, 'all', $event)">
+            <input type="checkbox" [checked]="isItemSelected(noticePeriodFilter(), 'all')" (click)="$event.stopPropagation(); toggleOptionInList(noticePeriodFilter, 'all', $event)">
+            <span>All Notice Periods</span>
+          </div>
+          <div class="custom-multiselect-divider"></div>
+          <div class="custom-multiselect-item" *ngFor="let opt of noticePeriodOptions" [class.selected]="isItemSelected(noticePeriodFilter(), opt.value)" (click)="toggleOptionInList(noticePeriodFilter, opt.value, $event)">
+            <input type="checkbox" [checked]="isItemSelected(noticePeriodFilter(), opt.value)" (click)="$event.stopPropagation(); toggleOptionInList(noticePeriodFilter, opt.value, $event)">
+            <span>{{ opt.label }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 8. Current CTC -->
+    <div class="filter-field">
+      <label>Current CTC</label>
+      <div class="custom-multiselect" (click)="$event.stopPropagation()">
+        <button type="button" class="custom-multiselect-trigger" [class.active]="isDropdownOpen('curCtc')" (click)="toggleDropdown('curCtc', $event)">
+          <span class="custom-multiselect-label">{{ getCurrentCtcFilterDisplayText() }}</span>
+          <i class="fa-solid fa-chevron-down multiselect-chevron" [class.rotated]="isDropdownOpen('curCtc')"></i>
+        </button>
+        <div class="custom-multiselect-dropdown" *ngIf="isDropdownOpen('curCtc')">
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(currentCtcFilter(), 'all')" (click)="toggleOptionInList(currentCtcFilter, 'all', $event)">
+            <input type="checkbox" [checked]="isItemSelected(currentCtcFilter(), 'all')" (click)="$event.stopPropagation(); toggleOptionInList(currentCtcFilter, 'all', $event)">
+            <span>All Current CTC</span>
+          </div>
+          <div class="custom-multiselect-divider"></div>
+          <div class="custom-multiselect-item" *ngFor="let opt of ctcOptions" [class.selected]="isItemSelected(currentCtcFilter(), opt.value)" (click)="toggleOptionInList(currentCtcFilter, opt.value, $event)">
+            <input type="checkbox" [checked]="isItemSelected(currentCtcFilter(), opt.value)" (click)="$event.stopPropagation(); toggleOptionInList(currentCtcFilter, opt.value, $event)">
+            <span>{{ opt.label }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 9. Expected CTC -->
+    <div class="filter-field">
+      <label>Expected CTC</label>
+      <div class="custom-multiselect" (click)="$event.stopPropagation()">
+        <button type="button" class="custom-multiselect-trigger" [class.active]="isDropdownOpen('expCtc')" (click)="toggleDropdown('expCtc', $event)">
+          <span class="custom-multiselect-label">{{ getExpectedCtcFilterDisplayText() }}</span>
+          <i class="fa-solid fa-chevron-down multiselect-chevron" [class.rotated]="isDropdownOpen('expCtc')"></i>
+        </button>
+        <div class="custom-multiselect-dropdown" *ngIf="isDropdownOpen('expCtc')">
+          <div class="custom-multiselect-item" [class.selected]="isItemSelected(expectedCtcFilter(), 'all')" (click)="toggleOptionInList(expectedCtcFilter, 'all', $event)">
+            <input type="checkbox" [checked]="isItemSelected(expectedCtcFilter(), 'all')" (click)="$event.stopPropagation(); toggleOptionInList(expectedCtcFilter, 'all', $event)">
+            <span>All Expected CTC</span>
+          </div>
+          <div class="custom-multiselect-divider"></div>
+          <div class="custom-multiselect-item" *ngFor="let opt of ctcOptions" [class.selected]="isItemSelected(expectedCtcFilter(), opt.value)" (click)="toggleOptionInList(expectedCtcFilter, opt.value, $event)">
+            <input type="checkbox" [checked]="isItemSelected(expectedCtcFilter(), opt.value)" (click)="$event.stopPropagation(); toggleOptionInList(expectedCtcFilter, opt.value, $event)">
+            <span>{{ opt.label }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 10. From Date -->
+    <div class="filter-field">
+      <label>From Date</label>
+      <input type="date" [ngModel]="fromDate()" (ngModelChange)="setFromDate($event)">
+    </div>
+
+    <!-- 11. To Date -->
+    <div class="filter-field">
+      <label>To Date</label>
+      <input type="date" [ngModel]="toDate()" (ngModelChange)="setToDate($event)">
+    </div>
+  </div>
+</div>
+
+<!-- Active Filter Chips Tag Bar -->
+<div class="active-chips-bar" *ngIf="activeFilterCount() > 0 || searchQuery()">
+  <div class="chips-label">
+    <span>Active Filters:</span>
+  </div>
+  <div class="chips-list">
+    <!-- Search Chip -->
+    <span class="filter-tag-pill" *ngIf="searchQuery()">
+      <i class="fa-solid fa-magnifying-glass"></i> "{{ searchQuery() }}"
+      <button type="button" (click)="clearSingleFilter('search')"><i class="fa-solid fa-xmark"></i></button>
+    </span>
+
+    <!-- Role Chips -->
+    <ng-container *ngFor="let r of roleFilter()">
+      <span class="filter-tag-pill">
+        <span>Role: {{ r }}</span>
+        <button type="button" (click)="removeOptionFromList(roleFilter, r, $event)"><i class="fa-solid fa-xmark"></i></button>
+      </span>
+    </ng-container>
+
+    <!-- Experience Chips -->
+    <ng-container *ngFor="let expVal of experienceFilter()">
+      <span class="filter-tag-pill">
+        <span>Exp: {{ getExpOptionLabel(expVal) }}</span>
+        <button type="button" (click)="removeOptionFromList(experienceFilter, expVal, $event)"><i class="fa-solid fa-xmark"></i></button>
+      </span>
+    </ng-container>
+
+    <!-- Degree Chips -->
+    <ng-container *ngFor="let deg of degreeFilter()">
+      <span class="filter-tag-pill">
+        <span>Degree: {{ deg }}</span>
+        <button type="button" (click)="removeOptionFromList(degreeFilter, deg, $event)"><i class="fa-solid fa-xmark"></i></button>
+      </span>
+    </ng-container>
+
+    <!-- Year Chips -->
+    <ng-container *ngFor="let yr of yearFilter()">
+      <span class="filter-tag-pill">
+        <span>Batch: {{ yr }}</span>
+        <button type="button" (click)="removeOptionFromList(yearFilter, yr, $event)"><i class="fa-solid fa-xmark"></i></button>
+      </span>
+    </ng-container>
+
+    <!-- Assessment Chips -->
+    <ng-container *ngFor="let ass of assessmentFilter()">
+      <span class="filter-tag-pill">
+        <span>Assessment: {{ getAssessmentOptionLabel(ass) }}</span>
+        <button type="button" (click)="removeOptionFromList(assessmentFilter, ass, $event)"><i class="fa-solid fa-xmark"></i></button>
+      </span>
+    </ng-container>
+
+    <!-- Manager Chips -->
+    <ng-container *ngFor="let mgr of managerFilter()">
+      <span class="filter-tag-pill">
+        <span>Manager: {{ getManagerOptionLabel(mgr) }}</span>
+        <button type="button" (click)="removeOptionFromList(managerFilter, mgr, $event)"><i class="fa-solid fa-xmark"></i></button>
+      </span>
+    </ng-container>
+
+    <!-- Notice Period Chips -->
+    <ng-container *ngFor="let np of noticePeriodFilter()">
+      <span class="filter-tag-pill">
+        <span>Notice: {{ getNoticePeriodOptionLabel(np) }}</span>
+        <button type="button" (click)="removeOptionFromList(noticePeriodFilter, np, $event)"><i class="fa-solid fa-xmark"></i></button>
+      </span>
+    </ng-container>
+
+    <!-- Current CTC Chips -->
+    <ng-container *ngFor="let ctc of currentCtcFilter()">
+      <span class="filter-tag-pill">
+        <span>Cur CTC: {{ getCtcOptionLabel(ctc) }}</span>
+        <button type="button" (click)="removeOptionFromList(currentCtcFilter, ctc, $event)"><i class="fa-solid fa-xmark"></i></button>
+      </span>
+    </ng-container>
+
+    <!-- Expected CTC Chips -->
+    <ng-container *ngFor="let ctc of expectedCtcFilter()">
+      <span class="filter-tag-pill">
+        <span>Exp CTC: {{ getCtcOptionLabel(ctc) }}</span>
+        <button type="button" (click)="removeOptionFromList(expectedCtcFilter, ctc, $event)"><i class="fa-solid fa-xmark"></i></button>
+      </span>
+    </ng-container>
+
+    <!-- From Date Chip -->
+    <span class="filter-tag-pill" *ngIf="fromDate()">
+      <span>From: {{ fromDate() }}</span>
+      <button type="button" (click)="clearSingleFilter('fromDate')"><i class="fa-solid fa-xmark"></i></button>
+    </span>
+
+    <!-- To Date Chip -->
+    <span class="filter-tag-pill" *ngIf="toDate()">
+      <span>To: {{ toDate() }}</span>
+      <button type="button" (click)="clearSingleFilter('toDate')"><i class="fa-solid fa-xmark"></i></button>
+    </span>
+
+    <!-- Clear All -->
+    <button type="button" class="btn-clear-all-chips" (click)="resetAllFilters()">
+      Clear All
+    </button>
+  </div>
+  <div class="filtered-counter">
+    Showing <strong>{{ filteredRequests().length }}</strong> of {{ allRequests().length }}
+  </div>
+</div>
+
+<!-- Status Category Tabs -->
+<div class="request-tabs">
+  <div class="tabs-group">
+    <button [class.active]="currentCategory() === 'Pending'" (click)="setCategory('Pending')">
+      Pending
+      <span class="count-badge" *ngIf="pendingCount() > 0">{{ pendingCount() }}</span>
+      <span class="search-match-dot" *ngIf="hasSearchMatch('Pending')"></span>
+    </button>
+    <button [class.active]="currentCategory() === 'Shortlist'" (click)="setCategory('Shortlist')">
+      Shortlisted
+      <span class="count-badge" *ngIf="shortlistCount() > 0">{{ shortlistCount() }}</span>
+      <span class="search-match-dot" *ngIf="hasSearchMatch('Shortlist')"></span>
+    </button>
+    <button [class.active]="currentCategory() === 'Maybe'" (click)="setCategory('Maybe')">
+      Maybe
+      <span class="count-badge" *ngIf="maybeCount() > 0">{{ maybeCount() }}</span>
+      <span class="search-match-dot" *ngIf="hasSearchMatch('Maybe')"></span>
+    </button>
+    <button [class.active]="currentCategory() === 'Assigned'" (click)="setCategory('Assigned')">
+      Assigned
+      <span class="count-badge" *ngIf="assignedCount() > 0">{{ assignedCount() }}</span>
+      <span class="search-match-dot" *ngIf="hasSearchMatch('Assigned')"></span>
+    </button>
+    <button [class.active]="currentCategory() === 'Approved'" (click)="setCategory('Approved')">
+      Approved
+      <span class="count-badge" *ngIf="approvedCount() > 0">{{ approvedCount() }}</span>
+      <span class="search-match-dot" *ngIf="hasSearchMatch('Approved')"></span>
+    </button>
+    <button [class.active]="currentCategory() === 'Rejected'" (click)="setCategory('Rejected')">
+      Rejected
+      <span class="count-badge" *ngIf="rejectedCount() > 0">{{ rejectedCount() }}</span>
+      <span class="search-match-dot" *ngIf="hasSearchMatch('Rejected')"></span>
+    </button>
+  </div>
+</div>
+
+<!-- Main Table Container -->
+<div class="data-container" [class.loading]="isLoading()">
   <div *ngIf="!isLoading() && filteredRequests().length > 0" class="requests-table-wrapper">
     <table class="requests-table">
       <thead>
         <tr>
-          <th>Applicant</th>
-          <th>Role</th>
-          <th>Info</th>
-          <th>Actions</th>
+          <th #thName style="min-width: 150px;">
+            <span>Name</span>
+            <span class="col-resizer" (mousedown)="onColumnResize($event, thName)"></span>
+          </th>
+          <th #thEmail style="min-width: 190px;">
+            <span>Email</span>
+            <span class="col-resizer" (mousedown)="onColumnResize($event, thEmail)"></span>
+          </th>
+          <th #thRole style="min-width: 170px;">
+            <span>Role</span>
+            <span class="col-resizer" (mousedown)="onColumnResize($event, thRole)"></span>
+          </th>
+          <th #thDegree style="min-width: 140px;">
+            <span>Degree</span>
+            <span class="col-resizer" (mousedown)="onColumnResize($event, thDegree)"></span>
+          </th>
+          <th #thCollege style="min-width: 180px;">
+            <span>College</span>
+            <span class="col-resizer" (mousedown)="onColumnResize($event, thCollege)"></span>
+          </th>
+          <th #thExp style="min-width: 140px;">
+            <span>Experience Level</span>
+            <span class="col-resizer" (mousedown)="onColumnResize($event, thExp)"></span>
+          </th>
+          <th #thMgr style="min-width: 180px;">
+            <span>Manager</span>
+            <span class="col-resizer" (mousedown)="onColumnResize($event, thMgr)"></span>
+          </th>
+          <th #thStatus *ngIf="currentCategory() !== 'Pending'" style="min-width: 120px;">
+            <span>Status</span>
+            <span class="col-resizer" (mousedown)="onColumnResize($event, thStatus)"></span>
+          </th>
+          <th class="tbl-actions-col" style="width: 120px; text-align: left;">Actions</th>
         </tr>
       </thead>
       <tbody>
         <tr *ngFor="let req of filteredRequests()">
-          <!-- Applicant -->
-          <td>
-            <div class="tbl-person">
-              <div class="tbl-avatar onboarding">{{ req.fullName ? req.fullName.substring(0,1).toUpperCase() : 'NA' }}</div>
-              <div>
-                <div class="tbl-name" style="display: flex; align-items: center; gap: 6px;">
-                  {{ req.fullName }}
-                </div>
-                <div style="font-size: 13px; color: #64748b; margin-top: 2px;">{{ req.email || req.phone || 'New Hire' }}</div>
-              </div>
+          <!-- Name -->
+          <td [title]="req.fullName || ''">
+            <div class="tbl-name"
+              style="display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: #0f172a; max-width: 100%;">
+              <span class="cell-ellipsis">{{ req.fullName }}</span>
+              <span class="source-badge-pill" *ngIf="req.isWalkinDrive"
+                title="Registered via Walk-in Drive">Walk-in</span>
             </div>
           </td>
-          <!-- Role -->
-          <td>
-            <div class="tbl-text" style="white-space: normal; line-height: 1.4;">
-              <span style="display: block; font-weight: 600; color: #0f172a; margin-bottom: 2px;">{{ req.designation || req.role || 'Employee' }}</span>
-              <span style="color: #64748b;">{{ req.department || 'N/A' }}</span>
-            </div>
-          </td>
-          <!-- Info -->
-          <td>
-            <div class="tbl-info-icon">
-              <i class="fa-solid fa-circle-info"></i>
-              
-              <!-- Unified Info Hover Card -->
-              <div class="links-popover">
-                <div class="popover-title">Applicant Info</div>
-                <div class="info-grid">
-                  <div class="info-popover-row"><span>Education:</span> <strong>{{ req.qualification || 'N/A' }}</strong></div>
-                  <div class="info-popover-row"><span>College:</span> <strong>{{ req.college || 'N/A' }}</strong></div>
-                  <div class="info-popover-row"><span>CGPA:</span> <strong>{{ req.ugCgpa || 'N/A' }} (UG) | {{ req.pgCgpa || 'N/A' }} (PG)</strong></div>
-                  <div class="info-popover-row"><span>Experience:</span> <strong>{{ req.isExperienced ? req.experienceYears + ' Yrs' : 'Fresher' }}</strong></div>
-                  <div class="info-popover-row"><span>DOB:</span> <strong>{{ (req.dob | date:'shortDate') || 'N/A' }}</strong></div>
-                  <div class="info-popover-row"><span>Applied:</span> <strong>{{ req.createdAt | date:'d MMM y' }}</strong></div>
-                </div>
 
-                <ng-container *ngIf="req.projectLinks?.length">
-                  <div class="popover-title" style="margin-top: 12px;">Project Links</div>
-                  <div class="links-list">
-                    <a *ngFor="let link of req.projectLinks" [href]="link" target="_blank" class="link-pill">
-                      <i class="fa-solid fa-link"></i>
-                      <span class="link-text">{{ link }}</span>
-                    </a>
-                  </div>
-                </ng-container>
-              </div>
-            </div>
+          <!-- Email -->
+          <td [title]="req.email || req.phone || req.contact || ''">
+            <span class="cell-ellipsis" style="font-size: 13px; color: #64748b;">
+              {{ req.email || req.phone || req.contact || '-' }}
+            </span>
           </td>
-          <!-- Actions -->
+
+          <!-- Role -->
+          <td [title]="req.designation || req.role || ''">
+            <span class="cell-ellipsis" style="font-weight: 600; color: #0f172a; font-size: 13px;">
+              {{ req.designation || req.role || '-' }}
+            </span>
+          </td>
+
+          <!-- Degree -->
+          <td [title]="req.qualification || req.degree || ''">
+            <span class="cell-ellipsis" style="font-size: 13px; color: #334155; font-weight: 500;">
+              {{ req.qualification || req.degree || '-' }}
+            </span>
+          </td>
+
+          <!-- College -->
+          <td [title]="req.college || ''">
+            <span class="cell-ellipsis" style="font-size: 13px; color: #475569;">
+              {{ req.college || '-' }}
+            </span>
+          </td>
+
+          <!-- Experience Level -->
           <td>
+            <span class="badge-exp-tag" [class.fresher]="isFresherCandidate(req)"
+              [class.experienced]="!isFresherCandidate(req)" [title]="getExperienceDisplay(req)">
+              {{ getExperienceDisplay(req) }}
+            </span>
+          </td>
+
+          <!-- Manager status -->
+          <td class="tbl-manager-cell">
+            <div class="tbl-manager-info" *ngIf="req.assignedManager; else noManager">
+              <div class="tbl-name cell-ellipsis" [title]="req.assignedManager.fullName">{{ req.assignedManager.fullName
+                }}</div>
+            </div>
+            <ng-template #noManager>
+              <div class="tbl-assign-row" *ngIf="!req.assignedManager || req.managerApprovalStatus === 'rejected'">
+                <select #managerSelect class="tbl-select">
+                  <option value="">Assign Manager...</option>
+                  <option *ngFor="let m of managers()" [value]="m._id">{{ m.fullName }}{{ m.department ? ' (' +
+                    m.department + ')' : '' }}</option>
+                </select>
+                <button class="tbl-btn-assign" (click)="assignToManager(req._id, managerSelect.value)"
+                  [disabled]="isAssigning() === req._id">
+                  {{ isAssigning() === req._id ? '...' : 'Assign' }}
+                </button>
+              </div>
+            </ng-template>
+          </td>
+
+          <!-- Status -->
+          <td *ngIf="currentCategory() !== 'Pending'">
+            <span class="tbl-status-chip"
+              [ngClass]="req.status === 'shortlist' || req.status === 'maybe' ? req.status : (req.managerApprovalStatus || 'pending')">
+              {{ req.status === 'shortlist' ? 'Shortlisted' : (req.status === 'maybe' ? 'Maybe' :
+              (req.managerApprovalStatus || 'pending')) }}
+            </span>
+          </td>
+
+          <!-- Actions (sticky) -->
+          <td class="tbl-actions-col">
             <div class="tbl-actions">
-              <button class="tbl-btn tbl-btn-reject" (click)="rejectRequest(req._id)" title="Reject">
+              <button class="tbl-btn tbl-btn-reject" (click)="openRejectModal(req)" title="Reject">
                 <i class="fa-solid fa-xmark"></i>
               </button>
-              <button class="tbl-btn tbl-btn-approve" (click)="navigateTo(['/employees/approve', req._id])" title="Review & Accept">
+              <button class="tbl-btn tbl-btn-approve" [routerLink]="['/employees/approve', req._id]"
+                title="Review & Onboard">
                 <i class="fa-solid fa-user-plus"></i>
               </button>
             </div>
@@ -101,15 +557,82 @@
   </div>
 
   <div class="empty-state" *ngIf="!isLoading() && filteredRequests().length === 0">
-    <div class="empty-content">
-      <hugeicons-icon [icon]="UserCircleIcon" size="48" [strokeWidth]="1.5" color="#94a3b8"></hugeicons-icon>
-      <h3>No pending employees</h3>
-      <p>All clear! No new employee submissions found.</p>
-    </div>
+    <i class="fa-solid fa-inbox empty-icon"></i>
+    <h3>No applications match your filter criteria</h3>
+    <p>Try resetting some filters or searching for a different keyword.</p>
+    <button type="button" class="btn-reset-filters-empty" (click)="resetAllFilters()">
+      Reset All Filters
+    </button>
   </div>
 
   <div class="loading-overlay" *ngIf="isLoading()">
     <div class="spinner"></div>
     <p>Fetching requests...</p>
+  </div>
+
+  <!-- Reject Application Modal -->
+  <div class="modal-backdrop" *ngIf="showRejectModal()" (click)="closeRejectModal()">
+    <div class="modal-dialog shortlist-modal" (click)="$event.stopPropagation()">
+      <div class="modal-header">
+        <div>
+          <h3>Reject Application</h3>
+          <p>Send a rejection notification email to {{ rejectCandidate()?.fullName || 'the candidate' }}.</p>
+        </div>
+        <button type="button" class="btn-close-modal" (click)="closeRejectModal()">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Candidate Preview Tag -->
+        <div class="candidate-mini-card">
+          <div class="candidate-meta">
+            <span class="candidate-name">{{ rejectCandidate()?.fullName }}</span>
+            <span class="candidate-role">{{ rejectCandidate()?.designation || rejectCandidate()?.role || 'Applicant' }}</span>
+          </div>
+          <span class="candidate-email">{{ rejectCandidate()?.email || rejectCandidate()?.phone || '-' }}</span>
+        </div>
+
+        <!-- Optional Reason Input -->
+        <div class="form-group" style="margin-top: 1rem;">
+          <label style="font-size: 13px; font-weight: 600; color: #1e293b;">Rejection Feedback / Notes (Optional)</label>
+          <input 
+            type="text" 
+            [(ngModel)]="rejectForm.reason" 
+            (ngModelChange)="generateRejectEmailBody()" 
+            placeholder="e.g. Currently seeking candidates with stronger proficiency in specific domain."
+            class="modal-input"
+          >
+          <p style="font-size: 11px; color: #64748b; margin-top: 4px;">This note will be incorporated into the candidate's rejection email.</p>
+        </div>
+
+        <!-- Email Content Editor -->
+        <div class="email-editor-section">
+          <div class="editor-header">
+            <label>Rejection Email Content</label>
+            <button type="button" class="btn-regen" (click)="generateRejectEmailBody()" title="Reset to default template">
+              <i class="fa-solid fa-arrows-rotate"></i> Reset Template
+            </button>
+          </div>
+
+          <div class="form-group">
+            <input type="text" [(ngModel)]="rejectForm.emailSubject" placeholder="Email Subject" class="modal-input subject-input">
+          </div>
+
+          <div class="form-group">
+            <textarea [(ngModel)]="rejectForm.emailBody" rows="6" class="modal-textarea" placeholder="Email body content"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" (click)="closeRejectModal()" [disabled]="isSendingReject()">
+          Cancel
+        </button>
+        <button type="button" class="btn-danger" (click)="submitRejectModal()" [disabled]="isSendingReject()">
+          <span>{{ isSendingReject() ? 'Rejecting...' : 'Confirm & Send Rejection Email' }}</span>
+        </button>
+      </div>
+    </div>
   </div>
 </div>

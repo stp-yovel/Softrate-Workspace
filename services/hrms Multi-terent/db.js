@@ -28,7 +28,7 @@ const waitForConnection = (conn) => {
 const CONNECTION_OPTIONS = {
   maxPoolSize: 10,               // max concurrent connections per DB
   minPoolSize: 2,                // keep at least 2 warm
-  serverSelectionTimeoutMS: 5000,
+  serverSelectionTimeoutMS: 15000, // 15s provides stable Atlas replica set discovery on cold boot
   socketTimeoutMS: 45000,
   heartbeatFrequencyMS: 10000,
   retryWrites: true,

@@ -97,6 +97,15 @@
             <p class="field-hint">System alerts and new applications will be sent here.</p>
           </div>
 
+          <div class="field-group" style="margin-top: 1.25rem;">
+            <label>Company Official Address</label>
+            <div class="input-with-icon" [class.read-only]="!canEditCommunication()">
+              <i class="fa-solid fa-location-dot"></i>
+              <textarea class="location-input" rows="2" [ngModel]="communication().companyAddress" (ngModelChange)="communication.set({...communication(), companyAddress: $event})" placeholder="e.g. Softrate Tech Park, No: 60A, Velleeswaran Kovil Street, Mangadu, Chennai - 600122" [disabled]="!canEditCommunication()" style="padding-top: 10px;"></textarea>
+            </div>
+            <p class="field-hint">Official registered address printed on monthly payslips, offer letters, and formal documents.</p>
+          </div>
+
           <div class="section-title" style="margin-top: 2rem;">
             <h3>Company Branding & Signatures</h3>
           </div>
@@ -224,81 +233,246 @@
             </div>
             <textarea #txtIntOnboard class="location-input email-template-textarea" [ngModel]="communication().onboardingTemplateIntern" (ngModelChange)="communication.set({...communication(), onboardingTemplateIntern: $event})" [disabled]="!canEditCommunication()" placeholder="Enter HTML template here..."></textarea>
           </div>
-        </div>
-      </section>
 
-      <!-- Employee Roles Section -->
-      <section *ngIf="activeTab() === 'employee_roles'" class="config-card">
-        <div class="card-header-minimal">
-          <div class="hero-visual">
-            <div class="icon-wrapper">
-              <hugeicons-icon [icon]="UserCircleIcon" [size]="32" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+          <div class="field-group">
+            <label style="text-transform: none; font-size: 14px; font-weight: 600; color: #1e293b;">Candidate Shortlist & Meeting Invite Template</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; margin-bottom: 8px;">
+              <p class="field-hint" style="margin: 0;">Variables: <code>{{ '{' }}formattedName{{ '}' }}</code>, <code>{{ '{' }}role{{ '}' }}</code>, <code>{{ '{' }}meetDate{{ '}' }}</code>, <code>{{ '{' }}meetTime{{ '}' }}</code>, <code>{{ '{' }}meetLink{{ '}' }}</code>, <code>{{ '{' }}meetNotes{{ '}' }}</code>, <code>{{ '{' }}signature{{ '}' }}</code></p>
+              <select #varShortlist (change)="insertVariable(varShortlist, txtShortlist, 'shortlistInterviewTemplate')" [disabled]="!canEditCommunication()" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px; background: white; cursor: pointer;">
+                <option value="" disabled selected>Insert Variable...</option>
+                <option value="{formattedName}">Candidate Name</option>
+                <option value="{role}">Applied Role</option>
+                <option value="{meetDate}">Meeting Date</option>
+                <option value="{meetTime}">Meeting Time</option>
+                <option value="{meetLink}">Meeting Link</option>
+                <option value="{meetNotes}">Meeting Notes</option>
+                <option value="{signature}">Company Signature</option>
+              </select>
             </div>
-            <div class="hero-content">
-              <h2>Employee Roles</h2>
-              <p>Manage designations available for full-time staff members.</p>
-            </div>
-          </div>
-        </div>
-
-        <div class="form-body">
-          <div class="section-title">
-            <h3>Designation List</h3>
-            <button class="btn-add" (click)="addRole('employee')">
-              <i class="fa-solid fa-plus"></i> Add Role
-            </button>
+            <textarea #txtShortlist class="location-input email-template-textarea" [ngModel]="communication().shortlistInterviewTemplate" (ngModelChange)="communication.set({...communication(), shortlistInterviewTemplate: $event})" [disabled]="!canEditCommunication()" placeholder="Enter HTML template here..."></textarea>
           </div>
 
-          <div class="roles-grid">
-            <div class="role-chip-input" *ngFor="let role of employeeRoles(); let i = index; trackBy: trackByIndex" [class.read-only]="role.toLowerCase() === 'other'">
-              <input type="text" [ngModel]="role" (ngModelChange)="updateRole('employee', i, $event)" placeholder="Role Name" [disabled]="role.toLowerCase() === 'other'">
-              <button *ngIf="role.toLowerCase() !== 'other'" class="icon-btn-sm orange" (click)="removeRole('employee', i)" title="Remove Role">
-                <hugeicons-icon [icon]="Delete02Icon" [size]="18" [strokeWidth]="2" color="currentColor"></hugeicons-icon>
-              </button>
+          <div class="field-group">
+            <label style="text-transform: none; font-size: 14px; font-weight: 600; color: #1e293b;">Candidate Application Rejection Template</label>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 4px; margin-bottom: 8px;">
+              <p class="field-hint" style="margin: 0;">Variables: <code>{{ '{' }}formattedName{{ '}' }}</code>, <code>{{ '{' }}role{{ '}' }}</code>, <code>{{ '{' }}reason{{ '}' }}</code>, <code>{{ '{' }}signature{{ '}' }}</code></p>
+              <select #varReject (change)="insertVariable(varReject, txtReject, 'applicationRejectionTemplate')" [disabled]="!canEditCommunication()" style="padding: 4px 8px; border-radius: 6px; border: 1px solid #cbd5e1; font-size: 12px; background: white; cursor: pointer;">
+                <option value="" disabled selected>Insert Variable...</option>
+                <option value="{formattedName}">Candidate Name</option>
+                <option value="{role}">Applied Role</option>
+                <option value="{reason}">Rejection Reason / Remarks</option>
+                <option value="{signature}">Company Signature</option>
+              </select>
             </div>
-          </div>
-
-          <div *ngIf="employeeRoles().length === 0" class="empty-state-card">
-            <i class="fa-solid fa-user-tag"></i>
-            <p>No employee roles defined. Add some to categorize your staff.</p>
+            <textarea #txtReject class="location-input email-template-textarea" [ngModel]="communication().applicationRejectionTemplate" (ngModelChange)="communication.set({...communication(), applicationRejectionTemplate: $event})" [disabled]="!canEditCommunication()" placeholder="Enter HTML template here..."></textarea>
           </div>
         </div>
       </section>
 
-      <!-- Intern Roles Section -->
-      <section *ngIf="activeTab() === 'intern_roles'" class="config-card">
+      <!-- Unified Roles Section -->
+      <section *ngIf="activeTab() === 'employee_roles' || activeTab() === 'intern_roles' || activeTab() === 'company_roles'" class="config-card roles-card-section">
         <div class="card-header-minimal">
           <div class="hero-visual">
             <div class="icon-wrapper">
-              <hugeicons-icon [icon]="UserGroupIcon" [size]="32" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+              <hugeicons-icon [icon]="UserGroupIcon" [size]="28" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
             </div>
             <div class="hero-content">
-              <h2>Intern Roles</h2>
-              <p>Define roles available for intern applications and tracking.</p>
+              <h2>Company Roles & Designations</h2>
+              <p>Configure organizational job titles, assign employee or intern scopes, and manage website career listings.</p>
             </div>
           </div>
         </div>
 
-        <div class="form-body">
-          <div class="section-title">
-            <h3>Application Roles</h3>
-            <button class="btn-add" (click)="addRole('intern')">
-              <i class="fa-solid fa-plus"></i> Add Role
+        <div class="roles-manager-wrapper">
+          <!-- Clean Action Bar -->
+          <div class="roles-action-bar">
+            <!-- Search & Filters -->
+            <div class="roles-filter-bar">
+              <div class="roles-search-box">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input 
+                  type="text" 
+                  [ngModel]="rolesSearchQuery()" 
+                  (ngModelChange)="rolesSearchQuery.set($event)" 
+                  placeholder="Filter by designation..."
+                >
+                <button *ngIf="rolesSearchQuery()" class="btn-clear-search" (click)="rolesSearchQuery.set('')" title="Clear filter">
+                  <i class="fa-solid fa-xmark"></i>
+                </button>
+              </div>
+
+              <!-- Filter Pills -->
+              <div class="roles-tab-group">
+                <button type="button" class="tab-pill" [class.active]="rolesActiveFilter() === 'all'" (click)="rolesActiveFilter.set('all')">
+                  All <span class="tab-badge">{{ rolesCountAll() }}</span>
+                </button>
+                <button type="button" class="tab-pill" [class.active]="rolesActiveFilter() === 'employee'" (click)="rolesActiveFilter.set('employee')">
+                  Employees <span class="tab-badge">{{ rolesCountEmployee() }}</span>
+                </button>
+                <button type="button" class="tab-pill" [class.active]="rolesActiveFilter() === 'intern'" (click)="rolesActiveFilter.set('intern')">
+                  Interns <span class="tab-badge">{{ rolesCountIntern() }}</span>
+                </button>
+                <button type="button" class="tab-pill" [class.active]="rolesActiveFilter() === 'both'" (click)="rolesActiveFilter.set('both')">
+                  Both <span class="tab-badge">{{ rolesCountBoth() }}</span>
+                </button>
+                <button type="button" class="tab-pill" [class.active]="rolesActiveFilter() === 'careers'" (click)="rolesActiveFilter.set('careers')">
+                  On Careers <span class="tab-badge">{{ rolesCountCareers() }}</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Add Role Button -->
+            <button type="button" class="btn-add-role-clean" (click)="addUnifiedRole()">
+              <i class="fa-solid fa-plus"></i>
+              <span>Add Designation</span>
             </button>
           </div>
 
-          <div class="roles-grid">
-            <div class="role-chip-input" *ngFor="let role of internRoles(); let i = index; trackBy: trackByIndex" [class.read-only]="role.toLowerCase() === 'other'">
-              <input type="text" [ngModel]="role" (ngModelChange)="updateRole('intern', i, $event)" placeholder="Intern Role Name" [disabled]="role.toLowerCase() === 'other'">
-              <button *ngIf="role.toLowerCase() !== 'other'" class="icon-btn-sm orange" (click)="removeRole('intern', i)" title="Remove Role">
-                <hugeicons-icon [icon]="Delete02Icon" [size]="18" [strokeWidth]="2" color="currentColor"></hugeicons-icon>
+          <!-- Roles Table -->
+          <div class="roles-sheet-table">
+            <div class="table-head-row">
+              <div class="th-cell th-title">Role Title</div>
+              <div class="th-cell th-scope">Scope & Type</div>
+              <div class="th-cell th-careers">Website Careers Portal</div>
+              <div class="th-cell th-assessment">Assessment</div>
+              <div class="th-cell th-action"></div>
+            </div>
+
+            <div class="table-body-rows">
+              <div 
+                class="table-data-row" 
+                *ngFor="let r of filteredRoles(); trackBy: trackByIndex" 
+                [class.is-system-row]="(r?.name || '').toLowerCase() === 'other'"
+              >
+                <!-- Role Title -->
+                <div class="td-cell td-title">
+                  <div class="role-name-editor">
+                    <input 
+                      type="text" 
+                      class="role-name-input" 
+                      [ngModel]="r.name" 
+                      (ngModelChange)="updateUnifiedRoleName(r, $event)" 
+                      placeholder="e.g. Software Engineer" 
+                      [disabled]="(r?.name || '').toLowerCase() === 'other'"
+                    >
+                    <span *ngIf="(r?.name || '').toLowerCase() === 'other'" class="system-fallback-badge">System Required</span>
+                  </div>
+                </div>
+
+                <!-- Scope / Applicability -->
+                <div class="td-cell td-scope">
+                  <div class="scope-checkboxes" *ngIf="(r?.name || '').toLowerCase() !== 'other'">
+                    <label class="clean-check-label" [class.checked]="r.isEmployee">
+                      <input type="checkbox" [checked]="r.isEmployee" (change)="toggleUnifiedRoleFlag(r, 'isEmployee')">
+                      <span class="custom-checkbox">
+                        <i class="fa-solid fa-check" *ngIf="r.isEmployee"></i>
+                      </span>
+                      <span>Employee</span>
+                    </label>
+
+                    <label class="clean-check-label" [class.checked]="r.isIntern">
+                      <input type="checkbox" [checked]="r.isIntern" (change)="toggleUnifiedRoleFlag(r, 'isIntern')">
+                      <span class="custom-checkbox">
+                        <i class="fa-solid fa-check" *ngIf="r.isIntern"></i>
+                      </span>
+                      <span>Intern</span>
+                    </label>
+                  </div>
+                  <span *ngIf="(r?.name || '').toLowerCase() === 'other'" class="universal-scope-text">Universal (All Staff)</span>
+                </div>
+
+                <!-- Website Careers Portal -->
+                <div class="td-cell td-careers">
+                  <div class="career-status-cell" *ngIf="(r?.name || '').toLowerCase() !== 'other'">
+                    
+                    <!-- If Listed on Careers -->
+                    <div class="career-active-wrap" *ngIf="isRoleListedInCareers(r.name)">
+                      <div class="career-status-indicator" [class.is-urgent]="getCareerPostingForRole(r.name)?.is_important">
+                        <span class="status-dot"></span>
+                        <span class="status-text">{{ getCareerPostingForRole(r.name)?.is_important ? 'Urgent' : 'Published' }}</span>
+                      </div>
+
+                      <div class="career-actions-group">
+                        <button type="button" class="btn-clean-action" (click)="openCareerEditor(r.name)" title="Edit job details">
+                          <i class="fa-solid fa-sliders"></i>
+                          <span>Edit</span>
+                        </button>
+                        <button type="button" class="btn-clean-unlist" (click)="toggleRoleCareerListing(r.name, $event)" title="Unlist from careers page">
+                          Unlist
+                        </button>
+                      </div>
+                    </div>
+
+                    <!-- If Not Listed -->
+                    <div class="career-inactive-wrap" *ngIf="!isRoleListedInCareers(r.name)">
+                      <button type="button" class="btn-clean-publish" (click)="toggleRoleCareerListing(r.name, $event)">
+                        <i class="fa-solid fa-plus"></i>
+                        <span>List on Careers</span>
+                      </button>
+                    </div>
+
+                  </div>
+                  <span *ngIf="(r?.name || '').toLowerCase() === 'other'" class="scope-muted-dash">—</span>
+                </div>
+
+                <!-- Assessment Column -->
+                <div class="td-cell td-assessment">
+                  <div class="assessment-status-cell" *ngIf="(r?.name || '').toLowerCase() !== 'other'">
+                    
+                    <!-- If Assessment is Enabled with questions -->
+                    <div class="assessment-active-wrap" *ngIf="getRoleAssessment(r.name)?.enabled">
+                      <div class="assessment-status-indicator">
+                        <span class="status-dot assessment-dot-green"></span>
+                        <span class="status-text">{{ getRoleAssessment(r.name)?.questions?.length || 0 }} Questions</span>
+                      </div>
+                      <button type="button" class="btn-clean-action" (click)="openAssessmentEditor(r.name)" title="Edit assessment questions">
+                        <i class="fa-solid fa-sliders"></i>
+                        <span>Edit</span>
+                      </button>
+                    </div>
+
+                    <!-- If Assessment is Disabled or Not Setup -->
+                    <div class="assessment-inactive-wrap" *ngIf="!getRoleAssessment(r.name)?.enabled">
+                      <div class="assessment-status-indicator" *ngIf="getRoleAssessment(r.name) !== null">
+                        <span class="status-dot assessment-dot-gray"></span>
+                        <span class="status-text muted-text">Disabled</span>
+                      </div>
+                      <button type="button" class="btn-clean-action" (click)="openAssessmentEditor(r.name)" title="Configure assessment questions">
+                        <i class="fa-solid fa-wand-magic-sparkles"></i>
+                        <span>Configure</span>
+                      </button>
+                    </div>
+
+                  </div>
+                  <span *ngIf="(r?.name || '').toLowerCase() === 'other'" class="scope-muted-dash">—</span>
+                </div>
+
+                <!-- Actions Column -->
+                <div class="td-cell td-action">
+                  <button 
+                    *ngIf="(r?.name || '').toLowerCase() !== 'other'" 
+                    type="button" 
+                    class="btn-row-trash" 
+                    (click)="removeUnifiedRole(r)" 
+                    title="Delete designation"
+                  >
+                    <i class="fa-regular fa-trash-can"></i>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Empty State -->
+            <div *ngIf="filteredRoles().length === 0" class="roles-table-empty">
+              <div class="empty-icon-wrap">
+                <i class="fa-solid fa-magnifying-glass"></i>
+              </div>
+              <h4>No designations match your search</h4>
+              <p>Try refining your search keyword or selecting a different filter tab above.</p>
+              <button type="button" class="btn-reset-filters" (click)="rolesSearchQuery.set(''); rolesActiveFilter.set('all')">
+                Reset Filters
               </button>
             </div>
-          </div>
-
-          <div *ngIf="internRoles().length === 0" class="empty-state-card">
-            <i class="fa-solid fa-users-rectangle"></i>
-            <p>No intern roles defined. These will appear in the application form.</p>
           </div>
         </div>
       </section>
@@ -950,18 +1124,11 @@
           <span class="action-label">Email</span>
         </button>
 
-        <button class="nav-link" [class.active]="activeTab() === 'employee_roles'" (click)="activeTab.set('employee_roles')">
+        <button class="nav-link" [class.active]="activeTab() === 'employee_roles' || activeTab() === 'intern_roles' || activeTab() === 'company_roles'" (click)="activeTab.set('company_roles')">
           <div class="action-icon-circle teal-tint">
-            <hugeicons-icon [icon]="UserCircleIcon" [size]="22" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
-          </div>
-          <span class="action-label">Employee Roles</span>
-        </button>
-
-        <button class="nav-link" [class.active]="activeTab() === 'intern_roles'" (click)="activeTab.set('intern_roles')">
-          <div class="action-icon-circle purple-tint">
             <hugeicons-icon [icon]="UserGroupIcon" [size]="22" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
           </div>
-          <span class="action-label">Intern Roles</span>
+          <span class="action-label">Roles & Designations</span>
         </button>
 
         <button class="nav-link" [class.active]="activeTab() === 'payroll_settings'" (click)="activeTab.set('payroll_settings')">
@@ -992,8 +1159,325 @@
           <span class="action-label">Walkin Drives</span>
         </button>
       </div>
+    </div>
+  </div>
+</div>
 
+<!-- ==================== Career Posting Configuration Modal ==================== -->
+<div class="career-modal-backdrop" *ngIf="isCareerModalOpen()" (click)="closeCareerModal()">
+  <div class="career-modal-container" (click)="$event.stopPropagation()">
+    
+    <div class="career-modal-header">
+      <div class="header-title-wrap">
+        <div class="career-modal-icon-badge">
+          <i class="fa-solid fa-briefcase"></i>
+        </div>
+        <div>
+          <h2 class="career-modal-title">Configure Career Posting</h2>
+          <p class="career-modal-sub">Customise how this role appears on the live website career portal and job details page.</p>
+        </div>
+      </div>
+      <button type="button" class="btn-modal-close" (click)="closeCareerModal()" aria-label="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="career-modal-body" *ngIf="currentEditingJob()">
+      <!-- General Details Grid -->
+      <div class="career-form-section">
+        <h4 class="form-section-heading">Basic Information</h4>
+        
+        <div class="career-fields-grid">
+          <div class="career-field-group span-2">
+            <label>Job Title <span class="req">*</span></label>
+            <input type="text" class="career-input" [(ngModel)]="currentEditingJob().title" placeholder="e.g. Inside Sales Executive">
+          </div>
+
+          <div class="career-field-group">
+            <label>Category</label>
+            <select class="career-select" [ngModel]="currentEditingJob().category" (ngModelChange)="onCategoryChange($event)">
+              <option *ngFor="let cat of categoryOptions" [value]="cat.key">{{ cat.name }}</option>
+            </select>
+          </div>
+
+          <div class="career-field-group">
+            <label>Department</label>
+            <input type="text" class="career-input" [(ngModel)]="currentEditingJob().department" placeholder="e.g. Sales & Business Development">
+          </div>
+
+          <div class="career-field-group">
+            <label>Location</label>
+            <input type="text" class="career-input" [(ngModel)]="currentEditingJob().location" placeholder="e.g. India or Chennai, India">
+          </div>
+
+          <div class="career-field-group">
+            <label>Work Type</label>
+            <select class="career-select" [(ngModel)]="currentEditingJob().workType">
+              <option value="Full-Time">Full-Time</option>
+              <option value="Part-Time">Part-Time</option>
+              <option value="Internship">Internship</option>
+              <option value="Freelance / Contract">Freelance / Contract</option>
+              <option value="Remote">Remote</option>
+            </select>
+          </div>
+
+          <div class="career-field-group">
+            <label>Role Type</label>
+            <select class="career-select" [(ngModel)]="currentEditingJob().roleType">
+              <option value="Employee">Employee (Full-Time Staff)</option>
+              <option value="Internship">Internship</option>
+            </select>
+          </div>
+
+          <div class="career-field-group">
+            <label>Apply Email</label>
+            <input type="email" class="career-input" [(ngModel)]="currentEditingJob().applyEmail" placeholder="careers@softrateglobal.com">
+          </div>
+        </div>
+
+        <!-- Urgent Hiring Option -->
+        <div class="modal-setting-row">
+          <div class="modal-setting-info">
+            <label class="modal-setting-title" for="toggleUrgentOpening">Mark as urgent hiring</label>
+            <p class="modal-setting-desc">Highlight this role in the urgent openings popup on the website careers portal.</p>
+          </div>
+          <label class="switch" for="toggleUrgentOpening">
+            <input id="toggleUrgentOpening" type="checkbox" [(ngModel)]="currentEditingJob().is_important">
+            <span class="slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Descriptions -->
+      <div class="career-form-section">
+        <h4 class="form-section-heading">Role Overview</h4>
+        
+        <div class="career-field-group" style="margin-bottom: 14px;">
+          <label>Short Summary (Card Preview)</label>
+          <textarea class="career-textarea" rows="2" [(ngModel)]="currentEditingJob().shortSummary" placeholder="Brief 1-2 sentence overview displayed on the main career grid cards..."></textarea>
+        </div>
+
+        <div class="career-field-group">
+          <label>About The Role (Full Details Page)</label>
+          <textarea class="career-textarea" rows="3" [(ngModel)]="currentEditingJob().about" placeholder="Comprehensive description of the opportunity, expectations, and culture..."></textarea>
+        </div>
+      </div>
+
+      <!-- Key Responsibilities List Builder -->
+      <div class="career-form-section">
+        <div class="section-flex-header">
+          <h4 class="form-section-heading">Key Responsibilities</h4>
+          <span class="count-badge">{{ currentEditingJob().responsibilities?.length || 0 }} items</span>
+        </div>
+
+        <div class="item-input-row">
+          <input type="text" class="career-input" [ngModel]="tempResponsibility()" (ngModelChange)="tempResponsibility.set($event)" (keyup.enter)="addResponsibility()" placeholder="Add a responsibility bullet point...">
+          <button type="button" class="btn-item-add" (click)="addResponsibility()">
+            <i class="fa-solid fa-plus"></i> Add
+          </button>
+        </div>
+
+        <ul class="bullet-list-builder" *ngIf="currentEditingJob().responsibilities?.length > 0">
+          <li *ngFor="let item of currentEditingJob().responsibilities; let i = index">
+            <span class="bullet-dot">•</span>
+            <span class="bullet-text">{{ item }}</span>
+            <button type="button" class="btn-bullet-del" (click)="removeResponsibility(i)" title="Remove item">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Key Requirements List Builder -->
+      <div class="career-form-section">
+        <div class="section-flex-header">
+          <h4 class="form-section-heading">Key Requirements & Qualifications</h4>
+          <span class="count-badge">{{ currentEditingJob().requirements?.length || 0 }} items</span>
+        </div>
+
+        <div class="item-input-row">
+          <input type="text" class="career-input" [ngModel]="tempRequirement()" (ngModelChange)="tempRequirement.set($event)" (keyup.enter)="addRequirement()" placeholder="Add a qualification / requirement bullet point...">
+          <button type="button" class="btn-item-add" (click)="addRequirement()">
+            <i class="fa-solid fa-plus"></i> Add
+          </button>
+        </div>
+
+        <ul class="bullet-list-builder" *ngIf="currentEditingJob().requirements?.length > 0">
+          <li *ngFor="let item of currentEditingJob().requirements; let i = index">
+            <span class="bullet-dot">•</span>
+            <span class="bullet-text">{{ item }}</span>
+            <button type="button" class="btn-bullet-del" (click)="removeRequirement(i)" title="Remove item">
+              <i class="fa-solid fa-trash-can"></i>
+            </button>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Tags & Special Note -->
+      <div class="career-form-section">
+        <h4 class="form-section-heading">Tags & Additional Notes</h4>
+
+        <div class="career-field-group" style="margin-bottom: 14px;">
+          <label>Display Tags (Pills)</label>
+          <div class="item-input-row" style="margin-bottom: 8px;">
+            <input type="text" class="career-input" [ngModel]="tempTag()" (ngModelChange)="tempTag.set($event)" (keyup.enter)="addTag()" placeholder="e.g. Sales, India, Full-Time...">
+            <button type="button" class="btn-item-add" (click)="addTag()">
+              <i class="fa-solid fa-tag"></i> Add Tag
+            </button>
+          </div>
+          <div class="tags-chips-container" *ngIf="currentEditingJob().tags?.length > 0">
+            <span class="tag-chip" *ngFor="let tag of currentEditingJob().tags; let i = index">
+              {{ tag }}
+              <button type="button" class="tag-del-btn" (click)="removeTag(i)">&times;</button>
+            </span>
+          </div>
+        </div>
+
+        <div class="career-field-group">
+          <label>Special Note / Notice (Optional)</label>
+          <input type="text" class="career-input" [(ngModel)]="currentEditingJob().note" placeholder="e.g. Candidates with strong portfolio projects are welcome to apply.">
+        </div>
+      </div>
 
     </div>
+
+    <div class="career-modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="closeCareerModal()" [disabled]="isSavingCareerPosting()">
+        Cancel
+      </button>
+      <button type="button" class="btn-modal-save" (click)="saveCareerPostingModal()" [disabled]="isSavingCareerPosting()">
+        <i class="fa-solid fa-spinner fa-spin" *ngIf="isSavingCareerPosting()"></i>
+        <i class="fa-solid fa-check" *ngIf="!isSavingCareerPosting()"></i>
+        <span>{{ isSavingCareerPosting() ? 'Saving...' : 'Apply to Role' }}</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ==================== Dedicated Role Assessment Configuration Modal ==================== -->
+<div class="career-modal-backdrop" *ngIf="isAssessmentModalOpen()" (click)="closeAssessmentModal()">
+  <div class="career-modal-container" (click)="$event.stopPropagation()">
+    
+    <div class="career-modal-header">
+      <div class="header-title-wrap">
+        <div class="career-modal-icon-badge" style="background: rgba(99, 102, 241, 0.1); color: #6366f1;">
+          <i class="fa-solid fa-clipboard-check"></i>
+        </div>
+        <div>
+          <h2 class="career-modal-title">Role Assessment: {{ currentAssessmentRoleName() }}</h2>
+          <p class="career-modal-sub">Configure customized screening questions presented to applicants for this position.</p>
+        </div>
+      </div>
+      <button type="button" class="btn-modal-close" (click)="closeAssessmentModal()" aria-label="Close">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+    </div>
+
+    <div class="career-modal-body" *ngIf="currentEditingAssessment()">
+      <!-- Toggle Assessment Active -->
+      <div class="modal-setting-row" style="margin-bottom: 20px;">
+        <div class="modal-setting-info">
+          <label class="modal-setting-title" for="toggleModalRoleAssessment">Enable assessment for this role</label>
+          <p class="modal-setting-desc">When enabled, applicants will complete this evaluation on Step 4 of candidate registration.</p>
+        </div>
+        <label class="switch" for="toggleModalRoleAssessment">
+          <input id="toggleModalRoleAssessment" type="checkbox" [(ngModel)]="currentEditingAssessment().enabled">
+          <span class="slider"></span>
+        </label>
+      </div>
+
+      <div *ngIf="currentEditingAssessment()?.enabled">
+        <div class="career-fields-grid" style="margin-bottom: 16px;">
+          <div class="career-field-group span-2">
+            <label>Assessment Title <span class="req">*</span></label>
+            <input type="text" class="career-input" [(ngModel)]="currentEditingAssessment().title" placeholder="e.g. Frontend Developer Assessment">
+          </div>
+          <div class="career-field-group span-2">
+            <label>Guidance / Description (Optional)</label>
+            <textarea class="career-textarea" rows="2" [(ngModel)]="currentEditingAssessment().description" placeholder="Instructions or expectations shown to candidates..."></textarea>
+          </div>
+        </div>
+
+        <!-- Question Cards List -->
+        <div class="assessment-questions-list">
+          <div class="assessment-q-card" *ngFor="let q of currentEditingAssessment().questions; let qIdx = index">
+            <div class="assessment-q-card-header">
+              <div class="q-num-badge">Q{{ qIdx + 1 }}</div>
+              <div class="q-type-badge">{{ q.type | uppercase }}</div>
+              <div class="q-card-actions">
+                <label class="q-required-check" title="Is this question mandatory?">
+                  <input type="checkbox" [(ngModel)]="q.required">
+                  <span>Required</span>
+                </label>
+                <button type="button" class="btn-q-delete" (click)="removeAssessmentModalQuestion(qIdx)" title="Delete question">
+                  <i class="fa-solid fa-trash-can"></i>
+                </button>
+              </div>
+            </div>
+
+            <div class="assessment-q-card-body">
+              <div class="career-field-group" style="margin-bottom: 10px;">
+                <label>Question Label / Prompt <span class="req">*</span></label>
+                <input type="text" class="career-input" [(ngModel)]="q.label" placeholder="Enter question text...">
+              </div>
+
+              <div class="q-meta-grid">
+                <div class="career-field-group">
+                  <label>Response Type</label>
+                  <select class="career-select" [(ngModel)]="q.type">
+                    <option value="text">Short Text</option>
+                    <option value="textarea">Paragraph / Essay</option>
+                    <option value="dropdown">Single Select Dropdown</option>
+                    <option value="multiselect">Multi-Select Tags</option>
+                    <option value="links">Live Project / Portfolio Links</option>
+                    <option value="rating">Proficiency Rating</option>
+                  </select>
+                </div>
+
+                <div class="career-field-group" *ngIf="q.type === 'links'">
+                  <label>Minimum Required Links</label>
+                  <input type="number" class="career-input" [(ngModel)]="q.minLinks" min="1" max="5">
+                </div>
+              </div>
+
+              <!-- Options Builder for Dropdown or Multi-Select -->
+              <div class="q-options-builder" *ngIf="q.type === 'dropdown' || q.type === 'multiselect'">
+                <label class="options-label">Selectable Options ({{ q.options?.length || 0 }})</label>
+                <div class="q-options-tags-wrap" *ngIf="q.options?.length > 0">
+                  <span class="q-opt-pill" *ngFor="let opt of q.options; let optIdx = index">
+                    {{ opt }}
+                    <button type="button" class="btn-opt-del" (click)="removeOptionFromAssessmentModalQuestion(q, optIdx)">&times;</button>
+                  </span>
+                </div>
+                <div class="item-input-row" style="margin-top: 6px;">
+                  <input type="text" class="career-input" #newAssOptInput (keyup.enter)="addOptionToAssessmentModalQuestion(q, newAssOptInput)" placeholder="Add new option (e.g. React, Python, Yes)...">
+                  <button type="button" class="btn-item-add" (click)="addOptionToAssessmentModalQuestion(q, newAssOptInput)">
+                    <i class="fa-solid fa-plus"></i> Add Option
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Question Button -->
+        <button type="button" class="btn-add-question" (click)="addAssessmentModalQuestion()">
+          <i class="fa-solid fa-plus"></i> Add Question
+        </button>
+      </div>
+    </div>
+
+    <div class="career-modal-footer">
+      <button type="button" class="btn-modal-cancel" (click)="closeAssessmentModal()" [disabled]="isSavingAssessment()">
+        Cancel
+      </button>
+      <button type="button" class="btn-modal-save" (click)="saveAssessmentModal()" [disabled]="isSavingAssessment()">
+        <i class="fa-solid fa-spinner fa-spin" *ngIf="isSavingAssessment()"></i>
+        <i class="fa-solid fa-check" *ngIf="!isSavingAssessment()"></i>
+        <span>{{ isSavingAssessment() ? 'Saving...' : 'Save Assessment' }}</span>
+      </button>
+    </div>
+
   </div>
 </div>

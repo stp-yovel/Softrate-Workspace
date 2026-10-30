@@ -1,7 +1,8 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const Employee = require("../models/EmployeeModel");
 const LeaveCounter = require("../models/leaveCounter.model"); 
-const { sendEmail, LOGO_URL } = require("../utilities/sendEmail");
+const { sendEmail, LOGO_URL, getLogoUrl } = require("../utilities/sendEmail");
 const { getSignature } = require("../utilities/emailSignature");
 const multer = require("multer");
 const ExcelJS = require("exceljs");
@@ -48,7 +49,7 @@ router.post(
         await employeeRole.save();
       }
 
-      // Parse projectLinks (sent as JSON string from Flutter)
+      // Parse projectLinks (sent as JSON string from Flutter/Web)
       let projectLinks = [];
       try {
         if (req.body.projectLinks) {
@@ -57,6 +58,18 @@ router.post(
           projectLinks = projectLinks.filter(l => l && l.trim()).slice(0, 5);
         }
       } catch (_) { projectLinks = []; }
+
+      // Parse assessmentAnswers (sent as JSON string from frontend)
+      let assessmentAnswers = {};
+      try {
+        if (req.body.assessmentAnswers) {
+          assessmentAnswers = typeof req.body.assessmentAnswers === 'string'
+            ? JSON.parse(req.body.assessmentAnswers)
+            : req.body.assessmentAnswers;
+        }
+      } catch (_) { assessmentAnswers = {}; }
+
+      const isExperienced = req.body.isExperienced === 'true' || req.body.isExperienced === true;
 
       // 3. Create User in unified collection
       const newUser = new User({
@@ -77,6 +90,18 @@ router.post(
             phone: req.body.emergencyPhone
           }
         },
+        education: {
+          qualification: req.body.qualification || req.body.degree,
+          specialization: req.body.specialization || req.body.department,
+          college: req.body.college,
+          passingYear: req.body.passingYear
+        },
+        experience: {
+          isExperienced: isExperienced,
+          years: req.body.experienceYears,
+          previousOrg: req.body.previousOrg,
+          designation: req.body.designation || req.body.role
+        },
         employment: {
           type: 'FULL_TIME',
           designation: req.body.designation || req.body.role,
@@ -87,7 +112,8 @@ router.post(
           declaration: req.body.declaration === 'true' || req.body.declaration === true,
           bgConsent: req.body.bgConsent === 'true' || req.body.bgConsent === true,
           whatsappConsent: req.body.whatsappConsent === 'true' || req.body.whatsappConsent === true
-        }
+        },
+        assessmentAnswers
       });
 
       await newUser.save();
@@ -103,10 +129,28 @@ router.post(
         dob: req.body.dob,
         address: req.body.address,
         role: req.body.designation || req.body.role,
-        linkedin: req.body.linkedin,
+        department: req.body.department || '',
+        linkedin: (req.body.linkedin && req.body.linkedin.trim()) ? req.body.linkedin.trim() : 'https://linkedin.com',
         gender: req.body.gender,
         nationality: req.body.nationality,
         maritalStatus: req.body.maritalStatus,
+        degree: req.body.degree || '',
+        qualification: req.body.qualification || req.body.degree || '',
+        college: req.body.college || '',
+        passingYear: req.body.passingYear || '',
+        cgpaOrPercentage: req.body.cgpaOrPercentage || '',
+        location: req.body.location || '',
+        countryCode: req.body.countryCode || '+91',
+        jobId: req.body.jobId || '',
+        isExperienced: isExperienced,
+        experienceYears: req.body.experienceYears || '',
+        previousOrg: req.body.previousOrg || '',
+        designation: req.body.designation || req.body.role || '',
+        currentCtc: !isNaN(Number(req.body.currentCtc)) ? Number(req.body.currentCtc) : (parseFloat(req.body.currentCtc) || 0),
+        expectedCtc: !isNaN(Number(req.body.expectedCtc)) ? Number(req.body.expectedCtc) : (parseFloat(req.body.expectedCtc) || 0),
+        noticePeriod: !isNaN(Number(req.body.noticePeriod)) ? Number(req.body.noticePeriod) : (parseInt(req.body.noticePeriod, 10) || 0),
+        joiningDate: req.body.joiningDate || null,
+        assessmentAnswers,
         declaration: req.body.declaration === 'true' || req.body.declaration === true,
         bgConsent: req.body.bgConsent === 'true' || req.body.bgConsent === true,
         whatsappConsent: req.body.whatsappConsent === 'true' || req.body.whatsappConsent === true,
@@ -124,21 +168,73 @@ router.post(
         io.emit('activity-updated', { type: 'new_employee', employee: newEmployee });
       }
 
-      // Send initial application email to HR (no file attachments on initial submission)
-      await sendEmail({
-        to: req.tenant.receivingEmail,
-        subject: `New Employee Application: ${req.body.fullName}`,
-        html: `
-          <h3>New employee application received</h3>
-          <p><b>Name:</b> ${req.body.fullName}</p>
-          <p><b>Email:</b> ${req.body.email}</p>
-          <p><b>Phone:</b> ${req.body.phone}</p>
-          <p><b>Role:</b> ${req.body.role || req.body.designation || ''}</p>
-          <p><b>LinkedIn:</b> ${req.body.linkedin || 'N/A'}</p>
-          <p><i>Note: Education, experience &amp; identification documents will be submitted after first login.</i></p>
-        `,
-        replyTo: req.tenant.receivingEmail,
+      const { formatApplicationEmailHtml } = require("../utilities/applicationEmailTemplate");
+      const emailHtml = formatApplicationEmailHtml({
+        applicationType: 'Full-Time Employee',
+        fullName: newEmployee.fullName,
+        email: newEmployee.email,
+        phone: newEmployee.phone,
+        dob: req.body.dob,
+        gender: newEmployee.gender,
+        maritalStatus: newEmployee.maritalStatus,
+        location: newEmployee.location,
+        degree: newEmployee.degree,
+        qualification: newEmployee.qualification,
+        college: newEmployee.college,
+        department: newEmployee.department,
+        passingYear: newEmployee.passingYear,
+        cgpaOrPercentage: newEmployee.cgpaOrPercentage,
+        isExperienced: newEmployee.isExperienced,
+        experienceYears: newEmployee.experienceYears,
+        previousOrg: newEmployee.previousOrg,
+        designation: newEmployee.designation,
+        role: newEmployee.role,
+        currentCtc: newEmployee.currentCtc,
+        expectedCtc: newEmployee.expectedCtc,
+        noticePeriod: newEmployee.noticePeriod,
+        joiningDate: newEmployee.joiningDate ? (typeof newEmployee.joiningDate === 'string' ? newEmployee.joiningDate : new Date(newEmployee.joiningDate).toLocaleDateString()) : (req.body.joiningDate || ''),
+        jobId: newEmployee.jobId,
+        linkedin: newEmployee.linkedin,
+        projectLinks: newEmployee.projectLinks,
+        assessmentAnswers: newEmployee.assessmentAnswers
       });
+
+      // Send initial application email to HR (with resume attachment if provided)
+      const emailOptions = {
+        to: req.tenant.receivingEmail,
+        subject: `New Employee Application: ${req.body.fullName} (${newEmployee.role || 'Employee'})`,
+        html: emailHtml,
+        replyTo: req.tenant.receivingEmail,
+      };
+
+      if (req.body.resume) {
+        try {
+          const resumeBuffer = Buffer.from(req.body.resume, 'base64');
+          emailOptions.attachments = [
+            {
+              filename: `${(req.body.fullName || 'Employee').replace(/\s+/g, '_')}_Resume.pdf`,
+              content: resumeBuffer,
+              contentType: 'application/pdf'
+            }
+          ];
+        } catch (bufErr) {
+          console.error("Failed to parse resume buffer for employee email:", bufErr);
+        }
+      }
+
+      await sendEmail(emailOptions);
+
+      if (req.body.campusStudentId) {
+        try {
+          const CampusStudentModel = req.models && req.models.CampusStudent ? req.models.CampusStudent : require('../models/CampusStudent');
+          await CampusStudentModel.updateOne(
+            { _id: req.body.campusStudentId, companyId: req.tenant.companyId },
+            { $set: { isOnboarded: true, onboardedAt: new Date(), linkedCandidateId: newEmployee._id } }
+          );
+        } catch (csErr) {
+          console.error("[EmployeeAdd] Failed to link CampusStudent:", csErr);
+        }
+      }
 
       res.status(201).json({ message: "Employee submitted & email sent", userId: newUser._id, employeeMongoId: newEmployee._id });
     } catch (err) {
@@ -194,27 +290,46 @@ router.post(
       employee.previousOrg = req.body.previousOrg || employee.previousOrg;
       employee.designation = req.body.designation || employee.designation;
       employee.projectLinks = projectLinks;
+
+      // Update statutory & bank details
+      if (req.body.panNumber) employee.panNumber = req.body.panNumber.trim().toUpperCase();
+      if (req.body.uanNumber) employee.uanNumber = req.body.uanNumber.trim();
+      if (req.body.esiNumber) employee.esiNumber = req.body.esiNumber.trim();
+      if (req.body.bankName || req.body.accountNumber || req.body.ifscCode || req.body.branchName || req.body.accountHolderName) {
+        employee.bankDetails = {
+          bankName: req.body.bankName ? req.body.bankName.trim() : (employee.bankDetails?.bankName || ""),
+          accountNumber: req.body.accountNumber ? req.body.accountNumber.trim() : (employee.bankDetails?.accountNumber || ""),
+          ifscCode: req.body.ifscCode ? req.body.ifscCode.trim().toUpperCase() : (employee.bankDetails?.ifscCode || ""),
+          branchName: req.body.branchName ? req.body.branchName.trim() : (employee.bankDetails?.branchName || ""),
+          accountHolderName: req.body.accountHolderName ? req.body.accountHolderName.trim() : (employee.bankDetails?.accountHolderName || "")
+        };
+      }
+
       employee.completeDetails = true;
 
       await employee.save();
 
-      // Sync education/experience to User record as well
+      // Sync education/experience/bank to User record as well
+      const userUpdateData = {
+        'education.qualification': employee.qualification,
+        'education.specialization': employee.specialization,
+        'education.college': employee.college,
+        'education.passingYear': employee.passingYear,
+        'education.ugCgpa': employee.ugCgpa,
+        'education.pgCgpa': employee.pgCgpa,
+        'experience.isExperienced': employee.isExperienced,
+        'experience.years': employee.experienceYears,
+        'experience.previousOrg': employee.previousOrg,
+        'experience.designation': employee.designation,
+      };
+      if (employee.panNumber) userUpdateData['panNumber'] = employee.panNumber;
+      if (employee.uanNumber) userUpdateData['uanNumber'] = employee.uanNumber;
+      if (employee.esiNumber) userUpdateData['esiNumber'] = employee.esiNumber;
+      if (employee.bankDetails) userUpdateData['bankDetails'] = employee.bankDetails;
+
       await User.findOneAndUpdate(
         { email: { $regex: new RegExp(`^${employee.email.trim()}$`, 'i') }, companyId: req.tenant.companyId },
-        {
-          $set: {
-            'education.qualification': employee.qualification,
-            'education.specialization': employee.specialization,
-            'education.college': employee.college,
-            'education.passingYear': employee.passingYear,
-            'education.ugCgpa': employee.ugCgpa,
-            'education.pgCgpa': employee.pgCgpa,
-            'experience.isExperienced': employee.isExperienced,
-            'experience.years': employee.experienceYears,
-            'experience.previousOrg': employee.previousOrg,
-            'experience.designation': employee.designation,
-          }
-        }
+        { $set: userUpdateData }
       );
 
       // Email uploaded files to company communication email
@@ -289,7 +404,7 @@ router.get("/all/active", verifyTenant, async (req, res) => {
   try {
     const { range = "all", status = "all" } = req.query;
 
-    const statusFilter = status === "all" ? ["approved", "ongoing"] : [status];
+    const statusFilter = status === "all" ? ["approved", "ongoing"] : (status.includes(",") ? status.split(",") : [status]);
 
     const query = { status: { $in: statusFilter }, companyId: req.tenant.companyId };
 
@@ -335,29 +450,66 @@ router.get("/all/active", verifyTenant, async (req, res) => {
 router.get("/get/:id", verifyTenant, async (req, res) => {
   try {
     const { id } = req.params;
-    console.log(`[DEBUG] Fetching employee with ID: ${id}`);
-    
+
+    // ✅ Projection: exclude profilePhoto.data binary — the mobile dashboard
+    // loads profile photos separately. Avoids binary blob on every dashboard load.
+    const projection = { 'profilePhoto.data': 0 };
+
     let employee;
-    
-    // 1. Try finding by MongoDB ObjectId first
+    // Try ObjectId first (fastest), then custom EmployeeId
     if (id.match(/^[0-9a-fA-F]{24}$/)) {
-      employee = await Employee.findOne({ _id: id, companyId: req.tenant.companyId });
-    } 
-    
-    // 2. If not found or not an ObjectId, try finding by custom EmployeeId (case-insensitive)
+      employee = await Employee.findOne({ _id: id, companyId: req.tenant.companyId }, projection).lean();
+    }
     if (!employee) {
-      employee = await Employee.findOne({ 
+      employee = await Employee.findOne({
         EmployeeId: { $regex: new RegExp(`^${id}$`, 'i') },
-        companyId: req.tenant.companyId 
-      });
+        companyId: req.tenant.companyId
+      }, projection).lean();
     }
 
     if (!employee) {
-      console.log(`[DEBUG] Employee NOT found for ID: ${id}`);
       return res.status(404).json({ message: "Employee not found" });
     }
-    
-    console.log(`[DEBUG] Employee found: ${employee.fullName} (${employee.EmployeeId || 'No custom ID'})`);
+
+    // Attach Shortlist record data if available so that interview info / projectLinks / CTC are populated
+    if (req.models && req.models.Shortlist) {
+      try {
+        const shortlist = await req.models.Shortlist.findOne({
+          candidateId: employee._id,
+          companyId: req.tenant.companyId
+        }).lean();
+        if (shortlist) {
+          employee.shortlist = shortlist;
+          if ((employee.currentCtc === undefined || employee.currentCtc === 0 || employee.currentCtc === null || employee.currentCtc === '') && shortlist.currentCtc) {
+            employee.currentCtc = shortlist.currentCtc;
+          }
+          if ((employee.expectedCtc === undefined || employee.expectedCtc === 0 || employee.expectedCtc === null || employee.expectedCtc === '') && shortlist.expectedCtc) {
+            employee.expectedCtc = shortlist.expectedCtc;
+          }
+          if ((employee.noticePeriod === undefined || employee.noticePeriod === 0 || employee.noticePeriod === null || employee.noticePeriod === '') && shortlist.noticePeriod) {
+            employee.noticePeriod = shortlist.noticePeriod;
+          }
+          if (!employee.previousOrg && shortlist.previousOrg) {
+            employee.previousOrg = shortlist.previousOrg;
+          }
+          if (!employee.experienceYears && shortlist.experienceYears) {
+            employee.experienceYears = shortlist.experienceYears;
+          }
+          if ((!employee.projectLinks || employee.projectLinks.length === 0) && shortlist.projectLinks?.length > 0) {
+            employee.projectLinks = shortlist.projectLinks;
+          }
+          if (!employee.linkedin && shortlist.linkedin) {
+            employee.linkedin = shortlist.linkedin;
+          }
+          if (!employee.degree && shortlist.qualification) {
+            employee.degree = shortlist.qualification;
+          }
+        }
+      } catch (shortlistErr) {
+        console.error("Error populating shortlist info for employee:", shortlistErr.message);
+      }
+    }
+
     res.json({ employee });
   } catch (err) {
     console.error("Fetch Single Employee Error:", err);
@@ -492,9 +644,7 @@ router.put("/accept/:id", verifyTenant, async (req, res) => {
       const customSignature = company?.settings?.communication?.emailSignatureUrl;
       const customLogo = company?.settings?.communication?.emailLogoUrl;
       
-      const signatureHtml = customSignature 
-        ? `<div style="margin-top: 30px;"><img src="${customSignature}" alt="Company Signature" style="max-height: 80px; display: block;" /></div>`
-        : getSignature(LOGO_URL);
+      const signatureHtml = getSignature(customSignature);
 
       const logoHtml = customLogo
         ? `<div style="margin-bottom: 20px;"><img src="${customLogo}" alt="Company Logo" style="max-height: 60px; display: block;" /></div>`
@@ -831,21 +981,40 @@ router.put("/update/:id", verifyTenant, async (req, res) => {
       query.EmployeeId = { $regex: new RegExp(`^${id}$`, 'i') };
     }
 
-    const updatedEmployee = await Employee.findOneAndUpdate(
+    let updatedEmployee = await Employee.findOneAndUpdate(
       query,
       { $set: req.body },
       { new: true }
     );
 
-    if (!updatedEmployee) return res.status(404).json({ message: "Employee not found" });
+    if (!updatedEmployee) {
+      // Fallback: If updated by HR / User ID
+      const userQuery = id.match(/^[0-9a-fA-F]{24}$/) 
+        ? { _id: id, companyId: req.tenant.companyId }
+        : { employeeId: { $regex: new RegExp(`^${id}$`, 'i') }, companyId: req.tenant.companyId };
+        
+      const updatedUser = await User.findOneAndUpdate(
+        userQuery,
+        { $set: req.body },
+        { new: true }
+      );
+      if (updatedUser) {
+        return res.json({ message: "Profile updated successfully", employee: updatedUser });
+      }
+      return res.status(404).json({ message: "Employee not found" });
+    }
 
-    // Sync with User record if email, profile fields, or payroll changed
-    if (req.body.email || req.body.fullName || req.body.phone || req.body.payroll) {
+    // Sync with User record if email, profile fields, payroll, or statutory/bank details changed
+    if (req.body.email || req.body.fullName || req.body.phone || req.body.payroll || req.body.panNumber || req.body.uanNumber || req.body.esiNumber || req.body.bankDetails) {
       const updateData = {};
       if (req.body.fullName) updateData['profile.firstName'] = updatedEmployee.fullName;
       if (req.body.phone) updateData['profile.phone'] = updatedEmployee.phone;
       if (req.body.designation || req.body.role) updateData['employment.designation'] = updatedEmployee.designation || updatedEmployee.role;
       if (req.body.payroll) updateData['payroll'] = updatedEmployee.payroll;
+      if (req.body.panNumber !== undefined) updateData['panNumber'] = updatedEmployee.panNumber;
+      if (req.body.uanNumber !== undefined) updateData['uanNumber'] = updatedEmployee.uanNumber;
+      if (req.body.esiNumber !== undefined) updateData['esiNumber'] = updatedEmployee.esiNumber;
+      if (req.body.bankDetails) updateData['bankDetails'] = updatedEmployee.bankDetails;
 
       await User.findOneAndUpdate(
         { email: { $regex: new RegExp(`^${updatedEmployee.email.trim()}$`, 'i') }, companyId: req.tenant.companyId },
@@ -910,6 +1079,299 @@ router.put("/manager-review/:id", verifyTenant, async (req, res) => {
     res.json({ message: `Employee onboarding request ${status} by manager`, employee });
   } catch (error) {
     res.status(500).json({ message: "Server error", error });
+  }
+});
+
+/* ============================
+   SHORTLIST EMPLOYEE CANDIDATE & SEND MEETING INVITE
+============================ */
+router.put("/shortlist/:id", verifyTenant, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { emailSubject, emailBody, meetDate, meetTime, meetLink, meetNotes, role, department, designation } = req.body;
+    
+    let employee = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      employee = await Employee.findById(id);
+    }
+    if (!employee) {
+      employee = await Employee.findOne({ EmployeeId: id });
+    }
+
+    if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+    // 1. Update status
+    employee.status = "shortlist";
+    employee.managerApprovalStatus = "shortlist";
+    if (designation || role) employee.designation = designation || role;
+    if (department) employee.department = department;
+    await employee.save();
+
+    // 1b. Create or Update Shortlist document
+    let rescheduleBtnHtml = "";
+    if (req.models.Shortlist) {
+      try {
+        const parsedMeetDate = meetDate ? new Date(meetDate) : new Date();
+        const { generateRawToken, createRescheduleToken, buildRescheduleUrl, buildRescheduleButtonHtml } = require("../utilities/rescheduleHelper");
+        const rawToken = generateRawToken();
+        const shortlistRecord = await req.models.Shortlist.findOneAndUpdate(
+          { companyId: req.tenant.companyId, candidateId: employee._id },
+          {
+            companyId: req.tenant.companyId,
+            candidateId: employee._id,
+            candidateType: "Employee",
+            fullName: employee.fullName,
+            email: employee.email,
+            phone: employee.phone || "",
+            role: employee.designation || employee.role || "",
+            department: employee.department || "",
+            qualification: employee.qualification || employee.degree || "",
+            college: employee.college || "",
+            location: employee.location || "",
+            experienceYears: employee.experienceYears || "",
+            isExperienced: Boolean(employee.isExperienced),
+            currentCtc: employee.currentCtc || 0,
+            expectedCtc: employee.expectedCtc || 0,
+            noticePeriod: employee.noticePeriod || 0,
+            linkedin: employee.linkedin || "",
+            projectLinks: employee.projectLinks || [],
+            meetDate: isNaN(parsedMeetDate.getTime()) ? new Date() : parsedMeetDate,
+            meetTime: meetTime || "11:00 AM",
+            meetLink: meetLink || "",
+            meetNotes: meetNotes || "",
+            emailSubject: emailSubject || "",
+            emailBody: emailBody || "",
+            rescheduleToken: rawToken,
+            status: "scheduled",
+            scheduledBy: {
+              userId: req.user?.id || "",
+              name: req.user?.name || "HR Team"
+            },
+            scheduledAt: new Date()
+          },
+          { upsert: true, new: true, setDefaultsOnInsert: true }
+        );
+
+        if (shortlistRecord) {
+          const signedRescheduleToken = createRescheduleToken(
+            shortlistRecord._id,
+            req.tenant.companyId,
+            rawToken
+          );
+          const rescheduleUrl = buildRescheduleUrl(signedRescheduleToken);
+          rescheduleBtnHtml = buildRescheduleButtonHtml(rescheduleUrl);
+        }
+      } catch (shortlistErr) {
+        console.error("Failed to sync Shortlist record:", shortlistErr);
+      }
+    }
+
+    // 2. Fetch company settings for branding/signature
+    const Company = await _getMasterCompany();
+    const company = await Company.findById(req.tenant.companyId);
+    const customSignature = company?.settings?.communication?.emailSignatureUrl;
+
+    const signatureHtml = getSignature(customSignature);
+
+    // 3. Prepare email content
+    let finalHtml = emailBody;
+    const candRole = employee.designation || employee.role || "Job Applicant";
+    if (!finalHtml) {
+      const template = company?.settings?.communication?.shortlistInterviewTemplate;
+      if (template) {
+        finalHtml = template
+          .replace(/{formattedName}/g, employee.fullName)
+          .replace(/{role}/g, candRole)
+          .replace(/{meetDate}/g, meetDate || "TBD")
+          .replace(/{meetTime}/g, meetTime || "TBD")
+          .replace(/{meetLink}/g, meetLink || "Will be shared shortly")
+          .replace(/{meetNotes}/g, meetNotes || "None")
+          .replace(/{rescheduleButton}/g, rescheduleBtnHtml)
+          .replace(/{logo}/g, '')
+          .replace(/{signature}/g, signatureHtml);
+
+        if (rescheduleBtnHtml && !finalHtml.includes("Request to Reschedule")) {
+          finalHtml = finalHtml.replace(signatureHtml, `${rescheduleBtnHtml}\n${signatureHtml}`);
+        }
+      } else {
+        finalHtml = `
+          <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+            <p>Dear ${employee.fullName},</p>
+            <p>Congratulations! We are pleased to inform you that your application for the <b>${candRole}</b> position has been shortlisted.</p>
+            <p>We would like to invite you for an interview / discussion meeting scheduled as follows:</p>
+            <ul>
+              <li><b>Date & Time:</b> ${meetDate || 'TBD'} at ${meetTime || 'TBD'}</li>
+              <li><b>Meeting Platform / Link:</b> <a href="${meetLink || '#'}" target="_blank" style="color: #007bb6;">${meetLink || 'Link will be provided'}</a></li>
+              <li><b>Notes / Instructions:</b> ${meetNotes || 'Please join on time.'}</li>
+            </ul>
+            ${rescheduleBtnHtml}
+            <p>Please make sure to join on time.</p>
+            <p>Best regards,</p>
+            ${signatureHtml}
+          </div>
+        `;
+      }
+    } else {
+      let enrichedBody = emailBody
+        .replace(/{formattedName}/g, employee.fullName)
+        .replace(/{role}/g, candRole)
+        .replace(/{meetDate}/g, meetDate || "")
+        .replace(/{meetTime}/g, meetTime || "")
+        .replace(/{meetLink}/g, meetLink || "")
+        .replace(/{meetNotes}/g, meetNotes || "")
+        .replace(/{rescheduleButton}/g, rescheduleBtnHtml)
+        .replace(/{logo}/g, '')
+        .replace(/{signature}/g, signatureHtml);
+
+      if (rescheduleBtnHtml && !enrichedBody.includes("Request to Reschedule")) {
+        enrichedBody = `${enrichedBody}\n${rescheduleBtnHtml}`;
+      }
+
+      if (!enrichedBody.includes(signatureHtml) && !enrichedBody.includes('Company Signature') && !enrichedBody.includes('Authorized Signatory')) {
+        enrichedBody = `${enrichedBody}\n${signatureHtml}`;
+      }
+      finalHtml = enrichedBody;
+    }
+
+    const subject = emailSubject || `Application Shortlisted - Interview Scheduled for ${candRole} at Softrate`;
+
+    let emailSent = false;
+    let emailError = null;
+
+    if (employee.email) {
+      try {
+        await sendEmail({
+          to: employee.email,
+          subject,
+          html: finalHtml,
+          replyTo: req.tenant?.receivingEmail,
+        });
+        emailSent = true;
+        console.log(`[DEBUG] Shortlist interview email sent to employee candidate: ${employee.email}`);
+      } catch (mailErr) {
+        emailError = mailErr.message;
+        console.error("Shortlist email error:", mailErr);
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: emailSent 
+        ? "Candidate shortlisted and interview schedule email sent successfully" 
+        : `Candidate shortlisted, but email failed: ${emailError || 'No email address found'}`,
+      employee,
+      emailSent,
+      emailError 
+    });
+  } catch (err) {
+    console.error("Shortlist error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
+  }
+});
+
+/* ============================
+   REJECT EMPLOYEE CANDIDATE & SEND REJECTION EMAIL
+============================ */
+router.put("/reject/:id", verifyTenant, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, emailSubject, emailBody } = req.body;
+    
+    let employee = null;
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      employee = await Employee.findById(id);
+    }
+    if (!employee) {
+      employee = await Employee.findOne({ EmployeeId: id });
+    }
+
+    if (!employee) return res.status(404).json({ message: "Employee not found" });
+
+    // 1. Update status
+    employee.status = "rejected";
+    employee.managerApprovalStatus = "rejected";
+    if (reason) employee.rejectionReason = reason;
+    await employee.save();
+
+    // 2. Fetch company settings for branding/signature
+    const Company = await _getMasterCompany();
+    const company = await Company.findById(req.tenant.companyId);
+    const customSignature = company?.settings?.communication?.emailSignatureUrl;
+
+    const signatureHtml = getSignature(customSignature);
+
+    // 3. Prepare email content
+    let finalHtml = emailBody;
+    const candRole = employee.designation || employee.role || "Job Applicant";
+    const reasonText = reason ? reason.trim() : "";
+
+    if (!finalHtml) {
+      const template = company?.settings?.communication?.applicationRejectionTemplate;
+      if (template) {
+        finalHtml = template
+          .replace(/{formattedName}/g, employee.fullName)
+          .replace(/{role}/g, candRole)
+          .replace(/{reason}/g, reasonText)
+          .replace(/{logo}/g, '')
+          .replace(/{signature}/g, signatureHtml);
+      } else {
+        finalHtml = `
+          <div style="font-family: sans-serif; line-height: 1.6; color: #333;">
+            <p>Dear ${employee.fullName},</p>
+            <p>Thank you for taking the time to apply for the <b>${candRole}</b> position with us and for your interest in our company.</p>
+            <p>After careful consideration and review of your application, we regret to inform you that we will not be moving forward with your candidacy for this role at this time.</p>
+            ${reasonText ? `<p>${reasonText}</p>` : ''}
+            <p>We truly appreciate the effort you put into your application and wish you the very best in your job search and future professional endeavors.</p>
+            <p>Best regards,</p>
+            ${signatureHtml}
+          </div>
+        `;
+      }
+    } else {
+      let enrichedBody = emailBody
+        .replace(/{formattedName}/g, employee.fullName)
+        .replace(/{role}/g, candRole)
+        .replace(/{reason}/g, reasonText)
+        .replace(/{logo}/g, '')
+        .replace(/{signature}/g, signatureHtml);
+
+      if (!enrichedBody.includes(signatureHtml) && !enrichedBody.includes('Company Signature') && !enrichedBody.includes('Authorized Signatory')) {
+        enrichedBody = `${enrichedBody}\n${signatureHtml}`;
+      }
+      finalHtml = enrichedBody;
+    }
+
+    const subject = emailSubject || `Update regarding your application for ${candRole} at Softrate`;
+
+    let emailSent = false;
+    let emailError = null;
+
+    if (employee.email) {
+      try {
+        // await sendEmail({
+        //   to: employee.email,
+        //   subject,
+        //   html: finalHtml,
+        //   replyTo: req.tenant?.receivingEmail,
+        // });
+        // emailSent = true;
+        // console.log(`[DEBUG] Rejection email sent to candidate: ${employee.email}`);
+      } catch (mailErr) {
+        emailError = mailErr.message;
+        console.error("Employee rejection email error:", mailErr);
+      }
+    }
+
+    res.json({ 
+      success: true, 
+      message: "Application rejected successfully",
+      employee,
+      emailSent,
+      emailError 
+    });
+  } catch (err) {
+    console.error("Employee rejection error:", err);
+    res.status(500).json({ message: "Server error", error: err.message });
   }
 });
 

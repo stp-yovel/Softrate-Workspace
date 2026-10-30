@@ -218,7 +218,8 @@ router.get('/verify/:code', async (req, res) => {
         settings: {
           themeColor: settings.themeColor || '#00657F',
           internRoles: internRoles,
-          employeeRoles: employeeRoles
+          employeeRoles: employeeRoles,
+          careerPostings: settings.careerPostings || []
         }
       }
     };

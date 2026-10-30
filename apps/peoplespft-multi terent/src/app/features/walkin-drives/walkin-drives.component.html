@@ -17,6 +17,7 @@
     <table class="drives-table" *ngIf="activeDrives.length > 0">
       <thead>
         <tr>
+          <th>Type & Program</th>
           <th>Start Date & Time</th>
           <th>End Date & Time</th>
           <th>Actions</th>
@@ -25,12 +26,19 @@
       </thead>
       <tbody>
         <tr *ngFor="let drive of activeDrives">
+          <td>
+            <span class="badge" [style.background]="drive.driveType === 'seasonal' ? '#e0f2fe' : '#fef3c7'" [style.color]="drive.driveType === 'seasonal' ? '#0369a1' : '#b45309'" style="padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 0.75rem;">
+              {{ drive.driveType === 'seasonal' ? 'Seasonal Internship' : 'Walk-in Drive' }}
+            </span>
+            <div *ngIf="drive.title" style="font-size: 0.85rem; font-weight: 600; margin-top: 4px; color: #1e293b;">{{ drive.title }}</div>
+          </td>
           <td>{{ drive.startDate | date }} at {{ drive.startTime }}</td>
           <td>{{ drive.endDate | date }} at {{ drive.endTime }}</td>
           <td>
             <div class="table-actions">
-              <a [href]="getFullPdfUrl(drive.jdPdfUrl)" target="_blank" class="jd-link">JD PDF</a>
-              <a [href]="drive.whatsappGroupLink" target="_blank" class="wa-link">WhatsApp</a>
+              <a *ngIf="drive.jdPdfUrl" [href]="getFullPdfUrl(drive.jdPdfUrl)" target="_blank" class="jd-link">JD PDF</a>
+              <a *ngIf="drive.whatsappGroupLink" [href]="drive.whatsappGroupLink" target="_blank" class="wa-link">WhatsApp</a>
+              <span *ngIf="!drive.jdPdfUrl && !drive.whatsappGroupLink" style="color: #94a3b8; font-size: 0.8rem;">—</span>
             </div>
           </td>
           <td>
@@ -42,7 +50,7 @@
       </tbody>
     </table>
     <div *ngIf="activeDrives.length === 0" class="no-data">
-      No active walkin drives found.
+      No active drives found.
     </div>
   </div>
 
@@ -54,6 +62,7 @@
     <table class="drives-table" *ngIf="historyDrives.length > 0">
       <thead>
         <tr>
+          <th>Type & Program</th>
           <th>Start Date & Time</th>
           <th>End Date & Time</th>
           <th>Actions</th>
@@ -62,11 +71,18 @@
       </thead>
       <tbody>
         <tr *ngFor="let drive of historyDrives">
+          <td>
+            <span class="badge" [style.background]="drive.driveType === 'seasonal' ? '#e0f2fe' : '#fef3c7'" [style.color]="drive.driveType === 'seasonal' ? '#0369a1' : '#b45309'" style="padding: 4px 8px; border-radius: 6px; font-weight: 600; font-size: 0.75rem;">
+              {{ drive.driveType === 'seasonal' ? 'Seasonal Internship' : 'Walk-in Drive' }}
+            </span>
+            <div *ngIf="drive.title" style="font-size: 0.85rem; font-weight: 600; margin-top: 4px; color: #1e293b;">{{ drive.title }}</div>
+          </td>
           <td>{{ drive.startDate | date }} at {{ drive.startTime }}</td>
           <td>{{ drive.endDate | date }} at {{ drive.endTime }}</td>
           <td>
             <div class="table-actions">
-              <a [href]="getFullPdfUrl(drive.jdPdfUrl)" target="_blank" class="jd-link">JD PDF</a>
+              <a *ngIf="drive.jdPdfUrl" [href]="getFullPdfUrl(drive.jdPdfUrl)" target="_blank" class="jd-link">JD PDF</a>
+              <span *ngIf="!drive.jdPdfUrl" style="color: #94a3b8; font-size: 0.8rem;">—</span>
             </div>
           </td>
           <td>
@@ -78,7 +94,7 @@
       </tbody>
     </table>
     <div *ngIf="historyDrives.length === 0" class="no-data">
-      No ended walkin drives found.
+      No ended drives found.
     </div>
   </div>
 
@@ -86,10 +102,21 @@
   <div class="modal-overlay" *ngIf="isModalOpen">
     <div class="modal-content">
       <div class="modal-header">
-        <h3>Create Walkin Drive</h3>
+        <h3>Create Drive / Seasonal Program</h3>
         <button class="close-btn" (click)="closeModal()">&times;</button>
       </div>
       <div class="modal-body">
+        <div class="form-group" [class.full-width]="driveType !== 'seasonal'">
+          <label>Drive Type</label>
+          <select [(ngModel)]="driveType" class="form-control">
+            <option value="walkin">Walk-in Drive</option>
+            <option value="seasonal">Seasonal Internship (e.g. Winter / Summer)</option>
+          </select>
+        </div>
+        <div class="form-group" *ngIf="driveType === 'seasonal'">
+          <label>Program Title *</label>
+          <input type="text" [(ngModel)]="title" class="form-control" placeholder="e.g. Winter Internship 2026">
+        </div>
         <div class="form-group">
           <label>Start Date</label>
           <input type="date" [(ngModel)]="startDate" class="form-control">
@@ -106,13 +133,13 @@
           <label>End Time</label>
           <input type="time" [(ngModel)]="endTime" class="form-control">
         </div>
-        <div class="form-group">
-          <label>WhatsApp Group Link</label>
+        <div class="form-group full-width">
+          <label>WhatsApp Group Link {{ driveType === 'walkin' ? '*' : '(Optional)' }}</label>
           <input type="url" [(ngModel)]="whatsappGroupLink" class="form-control" placeholder="https://chat.whatsapp.com/...">
         </div>
-        <div class="form-group">
-          <label>JD PDF</label>
-          <input type="file" accept="application/pdf" (change)="onFileSelected($event)" class="form-control">
+        <div class="form-group full-width">
+          <label>JD PDF {{ driveType === 'walkin' ? '*' : '(Optional)' }}</label>
+          <input type="file" accept="application/pdf" (change)="onFileSelected($event)" class="form-control file-input">
         </div>
       </div>
       <div class="modal-footer">

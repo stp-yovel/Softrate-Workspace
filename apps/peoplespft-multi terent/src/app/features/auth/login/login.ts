@@ -22,16 +22,15 @@ export class Login implements OnInit {
   isLoading = signal(false);
   errorMessage = signal('');
   showPassword = signal(false);
+  rememberMe = false;
 
   ngOnInit() {
     const token = localStorage.getItem('auth_token');
     const role = localStorage.getItem('user_role');
     
-    const cachedCode = localStorage.getItem('cached_company_code');
-    if (cachedCode) {
-      this.credentials.companyCode = cachedCode;
-      this.forgotPasswordData.companyCode = cachedCode;
-    }
+    const cachedCode = localStorage.getItem('cached_company_code') || 'SOFTRATE';
+    this.credentials.companyCode = cachedCode;
+    this.forgotPasswordData.companyCode = cachedCode;
     
     if (token && role) {
       if (role === 'hr' || role === 'hr_admin') {
@@ -56,7 +55,7 @@ export class Login implements OnInit {
   confirmPassword = '';
   
   forgotPasswordData = {
-    companyCode: '',
+    companyCode: 'SOFTRATE',
     email: ''
   };
 
@@ -64,7 +63,7 @@ export class Login implements OnInit {
   ViewOffIcon = ViewOffIcon;
 
   credentials = {
-    companyCode: '',
+    companyCode: 'SOFTRATE',
     identifier: '',
     password: ''
   };
@@ -73,8 +72,18 @@ export class Login implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set('');
 
-    this.apiService.login(this.credentials.companyCode, this.credentials.identifier, this.credentials.password).subscribe({
+    const companyCode = (this.credentials.companyCode || localStorage.getItem('cached_company_code') || 'SOFTRATE').trim();
+
+    this.apiService.login(companyCode, this.credentials.identifier, this.credentials.password).subscribe({
       next: (res) => {
+        if (res.requiresOnboarding && res.onboardingType === 'campus') {
+          sessionStorage.setItem('campus_onboarding_student', JSON.stringify(res.campusStudent));
+          sessionStorage.setItem('campus_onboarding_company', res.companyCode || companyCode);
+          this.isLoading.set(false);
+          this.router.navigate(['/user-register']);
+          return;
+        }
+
         // Use the role returned by unified-login
         const actualRole = res.role;
         const userData = res.user || res.employee || res.hr;
@@ -209,7 +218,9 @@ export class Login implements OnInit {
     this.isLoading.set(true);
     this.errorMessage.set('');
 
-    this.apiService.forgotPassword(this.forgotPasswordData.companyCode, this.forgotPasswordData.email).subscribe({
+    const companyCode = (this.forgotPasswordData.companyCode || localStorage.getItem('cached_company_code') || 'SOFTRATE').trim();
+
+    this.apiService.forgotPassword(companyCode, this.forgotPasswordData.email).subscribe({
       next: (res: any) => {
         this.forgotPasswordSuccess.set(true);
         this.isLoading.set(false);

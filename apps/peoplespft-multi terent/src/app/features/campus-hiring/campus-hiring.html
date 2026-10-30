@@ -1,0 +1,1583 @@
+<div class="campus-layout">
+  
+  <!-- ========================================================================= -->
+  <!-- LEVEL 1: COLLEGE DIRECTORY (Clean & Uncluttered)                          -->
+  <!-- ========================================================================= -->
+  <div class="level-container" *ngIf="currentLevel() === 'colleges'">
+    
+    <!-- Embedded Header -->
+    <div class="campus-header">
+      <div class="header-left">
+        <div>
+          <h1>Campus Hiring & College Directory</h1>
+          <p>Onboard partner institutions, organize academic recruitment drives, and manage student candidate pipelines.</p>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Search Input -->
+        <div class="search-box">
+          <hugeicons-icon [icon]="Search01Icon" size="16" [strokeWidth]="1.5" color="#94a3b8"></hugeicons-icon>
+          <input 
+            type="text" 
+            placeholder="Search college by name, city, university..." 
+            [ngModel]="searchDirectory()" 
+            (ngModelChange)="searchDirectory.set($event)"
+          />
+        </div>
+
+        <!-- Add College Primary Button -->
+        <button class="btn-primary-ai" (click)="openAddCollegeModal()">
+          <hugeicons-icon [icon]="PlusSignIcon" size="18" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+          <span>Add College</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Loading State for Colleges -->
+    <div class="loading-state-card" *ngIf="isLoading()">
+      <div class="spinner"></div>
+      <p>Loading Colleges Directory...</p>
+    </div>
+
+    <!-- Colleges Enterprise Table View (Industry Look, No Student Count) -->
+    <div class="colleges-table-card" *ngIf="!isLoading() && filteredColleges().length > 0">
+      <table class="colleges-enterprise-table">
+        <thead>
+          <tr>
+            <th>Institution / College</th>
+            <th>Location</th>
+            <th>Placement Officer</th>
+            <th>Active Drives</th>
+            <th>MOU Status</th>
+            <th>Status</th>
+            <th class="th-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let college of filteredColleges()" (click)="selectCollege(college)" class="college-table-row">
+            <!-- College Identity -->
+            <td>
+              <div class="college-identity-stack">
+                <div class="college-avatar-box">
+                  <img 
+                    *ngIf="college.logoUrl && !$any(college).imgError" 
+                    [src]="resolveMediaUrl(college.logoUrl)" 
+                    (error)="$any(college).imgError = true" 
+                    alt="{{ college.name }}" 
+                    class="college-avatar-img" 
+                  />
+                  <div *ngIf="!college.logoUrl || $any(college).imgError" class="college-avatar-initials">
+                    {{ getCollegeInitials(college.name) }}
+                  </div>
+                </div>
+                <div class="college-name-group">
+                  <span class="tbl-college-name" title="{{ college.name }}">{{ college.name }}</span>
+                  <span class="tbl-college-university" *ngIf="college.university">{{ college.university }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Location -->
+            <td>
+              <span class="location-text" title="{{ college.address }}">{{ college.address }}</span>
+            </td>
+
+            <!-- Placement Officer -->
+            <td>
+              <div class="officer-table-cell">
+                <div class="officer-name-title">
+                  <strong class="officer-lead-name">{{ college.placementOfficer?.name || '—' }}</strong>
+                  <span class="officer-designation-sub" *ngIf="college.placementOfficer?.designation">{{ college.placementOfficer.designation }}</span>
+                </div>
+                <div class="officer-quick-contacts">
+                  <span *ngIf="college.placementOfficer?.email" class="officer-email-sub">{{ college.placementOfficer.email }}</span>
+                  <span *ngIf="college.placementOfficer?.phone" class="officer-phone-sub">{{ college.placementOfficer.phone }}</span>
+                </div>
+              </div>
+            </td>
+
+            <!-- Active Drives -->
+            <td>
+              <span class="drives-count-chip">
+                <strong>{{ college.totalDrives || 0 }}</strong> Drives
+              </span>
+            </td>
+
+            <!-- MOU Status -->
+            <td>
+              <div class="mou-status-cell">
+                <span class="mou-badge-pill signed" *ngIf="college.hasMouDocument">
+                  <hugeicons-icon [icon]="CheckmarkCircle02Icon" size="14" [strokeWidth]="2" color="#059669"></hugeicons-icon>
+                  <span>Signed</span>
+                </span>
+                <span class="mou-badge-pill pending" *ngIf="!college.hasMouDocument">
+                  <span>Pending</span>
+                </span>
+                <a 
+                  *ngIf="college.mouDriveLink" 
+                  [href]="college.mouDriveLink" 
+                  target="_blank" 
+                  rel="noopener noreferrer" 
+                  class="btn-mou-link" 
+                  (click)="$event.stopPropagation()" 
+                  title="Open MOU Drive Link"
+                >
+                  <hugeicons-icon [icon]="Link01Icon" size="13" [strokeWidth]="2" color="#64748b"></hugeicons-icon>
+                </a>
+              </div>
+            </td>
+
+            <!-- Status -->
+            <td>
+              <span class="status-chip-badge active">{{ college.status || 'Active' }}</span>
+            </td>
+
+            <!-- Action -->
+            <td class="td-actions">
+              <div class="table-actions-flex">
+                <button class="btn-table-edit" (click)="openEditCollegeModal(college); $event.stopPropagation()" title="Edit College Details">
+                  <hugeicons-icon [icon]="PencilEdit02Icon" size="14" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+                  <span>Edit</span>
+                </button>
+                <button class="btn-table-view" (click)="selectCollege(college); $event.stopPropagation()">
+                  <span>View Drives</span>
+                  <hugeicons-icon [icon]="ArrowRight01Icon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty State for Colleges (only when not loading) -->
+    <div class="empty-state-card" *ngIf="!isLoading() && filteredColleges().length === 0">
+      <div class="empty-icon-circle">
+        <hugeicons-icon [icon]="Mortarboard02Icon" size="48" [strokeWidth]="1.5" color="#94a3b8"></hugeicons-icon>
+      </div>
+      <h3>No Partner Colleges Added Yet</h3>
+      <p>Get started by onboarding partner institutions, placement officers, and signed MOUs.</p>
+      <button class="btn-primary-ai" (click)="openAddCollegeModal()">
+        <hugeicons-icon [icon]="PlusSignIcon" size="18" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+        <span>Add First College</span>
+      </button>
+    </div>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- LEVEL 2 & 3: COLLEGE PROFILE & ACADEMIC YEARS & DRIVES                   -->
+  <!-- ========================================================================= -->
+  <div class="level-container" *ngIf="currentLevel() === 'college-detail' && selectedCollege()">
+    
+    <!-- Top Navigation Breadcrumbs -->
+    <div class="breadcrumbs-bar">
+      <button class="btn-nav-back" (click)="backToColleges()">
+        <hugeicons-icon [icon]="ArrowLeft01Icon" size="16" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+        <span>All Colleges</span>
+      </button>
+      <span class="breadcrumb-separator">/</span>
+      <span class="breadcrumb-current">{{ selectedCollege().name }}</span>
+    </div>
+
+    <!-- College Hero Banner Card -->
+    <div class="college-hero-card">
+      <div class="hero-left">
+        <div class="hero-logo-box">
+          <img 
+            *ngIf="selectedCollege().logoUrl && !$any(selectedCollege()).imgError; else heroLogoFallback" 
+            [src]="resolveMediaUrl(selectedCollege().logoUrl)" 
+            (error)="$any(selectedCollege()).imgError = true"
+            alt="{{ selectedCollege().name }}" 
+            class="hero-logo-img" 
+          />
+          <ng-template #heroLogoFallback>
+            <div class="college-avatar-initials lg">
+              {{ getCollegeInitials(selectedCollege().name) }}
+            </div>
+          </ng-template>
+        </div>
+        <div class="hero-info">
+          <div class="hero-title-row">
+            <h2>{{ selectedCollege().name }}</h2>
+            <span class="university-pill" *ngIf="selectedCollege().university">{{ selectedCollege().university }}</span>
+            <span class="status-chip active">{{ selectedCollege().status || 'Active' }}</span>
+          </div>
+          <p class="hero-address">{{ selectedCollege().address }}</p>
+          <div class="hero-officer-line">
+            <span><strong>Placement Contact:</strong> {{ selectedCollege().placementOfficer?.name }} ({{ selectedCollege().placementOfficer?.designation }})</span>
+            <span class="dot-separator">•</span>
+            <span>{{ selectedCollege().placementOfficer?.email }}</span>
+            <span class="dot-separator">•</span>
+            <span>{{ selectedCollege().placementOfficer?.phone }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Hero Actions (MOU download / drive link / edit / create drive) -->
+      <div class="hero-actions">
+        <button 
+          class="btn-outline" 
+          (click)="openEditCollegeModal()" 
+          title="Edit College Information"
+        >
+          <hugeicons-icon [icon]="PencilEdit02Icon" size="16" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+          <span>Edit College</span>
+        </button>
+
+        <button 
+          class="btn-outline" 
+          *ngIf="selectedCollege().hasMouDocument" 
+          (click)="downloadCollegeMou(selectedCollege()._id)" 
+          title="Download signed MOU"
+        >
+          <hugeicons-icon [icon]="Download01Icon" size="16" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+          <span>Signed MOU</span>
+        </button>
+
+        <a 
+          class="btn-outline" 
+          *ngIf="selectedCollege().mouDriveLink" 
+          [href]="selectedCollege().mouDriveLink" 
+          target="_blank" 
+          rel="noopener noreferrer" 
+          title="Open MOU Google Drive link"
+        >
+          <hugeicons-icon [icon]="Link01Icon" size="16" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+          <span>MOU Drive Link</span>
+        </a>
+
+        <button class="btn-primary-ai" (click)="openCreateDriveModal()">
+          <hugeicons-icon [icon]="PlusSignIcon" size="16" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+          <span>Create Drive</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Academic Years Header & Switcher -->
+    <div class="section-header-bar">
+      <div class="section-title-group">
+        <h3>Academic Hiring Years</h3>
+        <p>Select an academic year to review scheduled drives, timeline conduct, and student hiring records.</p>
+      </div>
+      <button class="btn-secondary-sm" (click)="openAddYearModal()">
+        <hugeicons-icon [icon]="PlusSignIcon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+        <span>Add Academic Year</span>
+      </button>
+    </div>
+
+    <!-- Academic Years Enterprise Table Format -->
+    <div class="ay-table-card" *ngIf="selectedCollege().academicYearsWithStats?.length > 0; else noYearsTpl">
+      <table class="ay-enterprise-table">
+        <thead>
+          <tr>
+            <th>Academic Year</th>
+            <th>Batch / Remarks</th>
+            <th>Timeline Conducted</th>
+            <th>Drives Conducted</th>
+            <th>Selected</th>
+            <th class="th-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr 
+            *ngFor="let ay of selectedCollege().academicYearsWithStats" 
+            (click)="openDrivesForYear(ay.year)"
+            class="ay-table-row"
+          >
+            <td>
+              <div class="ay-identity">
+                <hugeicons-icon [icon]="Calendar03Icon" size="16" [strokeWidth]="1.8" color="#4f46e5"></hugeicons-icon>
+                <strong>{{ ay.year }}</strong>
+              </div>
+            </td>
+            <td>
+              <span class="ay-notes-text">{{ ay.notes || '—' }}</span>
+            </td>
+            <td>
+              <span class="timeline-text" *ngIf="ay.earliestStart">
+                {{ ay.earliestStart | date:'mediumDate' }} - {{ (ay.latestEnd | date:'mediumDate') || 'Ongoing' }}
+              </span>
+              <span class="timeline-text" *ngIf="!ay.earliestStart">—</span>
+            </td>
+            <td>
+              <span class="drives-count-chip">
+                <strong>{{ ay.drivesCount || 0 }}</strong> Drives
+              </span>
+            </td>
+            <td>
+              <span class="selected-count-chip" *ngIf="ay.selectedCount > 0">
+                <strong>{{ ay.selectedCount }}</strong> Selected
+              </span>
+              <span *ngIf="!ay.selectedCount || ay.selectedCount === 0" class="muted-dash">—</span>
+            </td>
+            <td class="th-actions">
+              <button 
+                class="btn-table-view" 
+                (click)="openDrivesForYear(ay.year); $event.stopPropagation()"
+              >
+                <span>View Drives</span>
+                <hugeicons-icon [icon]="ArrowRight01Icon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #noYearsTpl>
+      <div class="empty-state-mini">
+        <p>No academic years recorded yet. Click "+ Add Academic Year" to initialize.</p>
+      </div>
+    </ng-template>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- LEVEL 3: CAMPUS DRIVES FOR SELECTED ACADEMIC YEAR (Separate Screen)       -->
+  <!-- ========================================================================= -->
+  <div class="level-container" *ngIf="currentLevel() === 'drives-list' && selectedCollege() && selectedAcademicYear()">
+    
+    <!-- Top Navigation Breadcrumbs -->
+    <div class="breadcrumbs-bar">
+      <button class="btn-nav-back" (click)="backToAcademicYears()">
+        <hugeicons-icon [icon]="ArrowLeft01Icon" size="16" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+        <span>Back to Academic Years</span>
+      </button>
+      <span class="breadcrumb-separator">/</span>
+      <span class="breadcrumb-link" (click)="backToAcademicYears()">{{ selectedCollege().name }}</span>
+      <span class="breadcrumb-separator">/</span>
+      <span class="breadcrumb-current">{{ selectedAcademicYear() }} Drives</span>
+    </div>
+
+    <!-- Drives Section Header -->
+    <div class="section-header-bar drives-header-top">
+      <div class="section-title-group">
+        <h3>Campus Drives for Academic Year {{ selectedAcademicYear() }}</h3>
+        <p>Review scheduled recruitment drives, target roles, interview rounds, and student pipelines.</p>
+      </div>
+      <button class="btn-primary-ai" (click)="openCreateDriveModal()">
+        <hugeicons-icon [icon]="PlusSignIcon" size="16" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+        <span>New Campus Drive</span>
+      </button>
+    </div>
+
+    <!-- Drives Enterprise Table Format -->
+    <div class="drives-table-card" *ngIf="currentYearDrives().length > 0; else noDrivesTpl">
+      <table class="drives-enterprise-table">
+        <thead>
+          <tr>
+            <th class="th-drive-title">Drive Title</th>
+            <th class="th-roles">Target Roles</th>
+            <th class="th-dates">Recruitment Dates</th>
+            <th class="th-pipeline">Interview Pipeline</th>
+            <th class="th-status">Status</th>
+            <th class="th-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr 
+            *ngFor="let drive of currentYearDrives()" 
+            (click)="selectDrive(drive)"
+            class="drive-table-row"
+          >
+            <td class="td-drive-title">
+              <div class="drive-title-stack">
+                <strong class="tbl-drive-title">{{ drive.title }}</strong>
+                <span class="tbl-drive-academic-year">{{ drive.academicYear }}</span>
+              </div>
+            </td>
+            <td class="td-roles">
+              <div class="roles-chips-container sm">
+                <span class="role-chip" *ngFor="let role of drive.roles">{{ role }}</span>
+                <span *ngIf="!drive.roles || drive.roles.length === 0" class="muted-dash">—</span>
+              </div>
+            </td>
+            <td class="td-dates">
+              <div class="drive-dates">
+                <hugeicons-icon [icon]="Calendar01Icon" size="14" [strokeWidth]="1.5" color="#64748b"></hugeicons-icon>
+                <span>{{ drive.startDate | date:'mediumDate' }} - {{ drive.endDate | date:'mediumDate' }}</span>
+              </div>
+            </td>
+            <td class="td-pipeline">
+              <div class="pipeline-summary-cell">
+                <span class="pipeline-count-lead"><strong>{{ drive.rounds?.length || 0 }}</strong> Rounds</span>
+                <div class="pipeline-flow-chain">
+                  <span *ngFor="let round of drive.rounds; let last = last" class="flow-step" [title]="round.name">
+                    {{ getShortRoundName(round.name) }}<span *ngIf="!last" class="flow-sep">›</span>
+                  </span>
+                </div>
+              </div>
+            </td>
+            <td class="td-status">
+              <span class="drive-status-pill">{{ drive.status || 'Scheduled' }}</span>
+            </td>
+            <td class="td-actions">
+              <button class="btn-table-view" (click)="selectDrive(drive); $event.stopPropagation()">
+                <span>View Students</span>
+                <hugeicons-icon [icon]="ArrowRight01Icon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <ng-template #noDrivesTpl>
+      <div class="empty-state-card mini">
+        <h5>No Drives Scheduled for {{ selectedAcademicYear() }}</h5>
+        <p>Create a drive to specify hiring roles, recruitment schedule, and interview rounds.</p>
+        <button class="btn-primary-ai" (click)="openCreateDriveModal()">
+          <hugeicons-icon [icon]="PlusSignIcon" size="16" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+          <span>Create Campus Drive</span>
+        </button>
+      </div>
+    </ng-template>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- LEVEL 4: DRIVE CANDIDATE WORKSPACE & EXCEL MAPPING ENGINE                 -->
+  <!-- ========================================================================= -->
+  <div class="level-container" *ngIf="currentLevel() === 'drive-detail' && selectedDrive()">
+    
+    <!-- Top Navigation Breadcrumbs -->
+    <div class="breadcrumbs-bar">
+      <button class="btn-nav-back" (click)="backToCollegeDetail()">
+        <hugeicons-icon [icon]="ArrowLeft01Icon" size="16" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+        <span>Back to {{ selectedDrive().academicYear }} Drives</span>
+      </button>
+      <span class="breadcrumb-separator">/</span>
+      <span class="breadcrumb-link" (click)="backToAcademicYears()">{{ selectedDrive().college?.name || 'College' }}</span>
+      <span class="breadcrumb-separator">/</span>
+      <span class="breadcrumb-link" (click)="backToCollegeDetail()">{{ selectedDrive().academicYear }} Drives</span>
+      <span class="breadcrumb-separator">/</span>
+      <span class="breadcrumb-current">{{ selectedDrive().title }}</span>
+    </div>
+
+    <!-- Drive Header Summary Banner -->
+    <div class="drive-workspace-header">
+      <div class="drive-info-left">
+        <div class="drive-title-flex">
+          <h2>{{ selectedDrive().title }}</h2>
+          <span class="year-badge">{{ selectedDrive().academicYear }}</span>
+          <span class="drive-status-pill">{{ selectedDrive().status || 'Scheduled' }}</span>
+        </div>
+        
+        <div class="drive-meta-row">
+          <span><strong>College:</strong> {{ selectedDrive().college?.name }}</span>
+          <span class="dot-separator">•</span>
+          <span><strong>Timeline:</strong> {{ selectedDrive().startDate | date:'mediumDate' }} - {{ selectedDrive().endDate | date:'mediumDate' }}</span>
+          <span class="dot-separator">•</span>
+          <span><strong>Target Roles:</strong> {{ selectedDrive().roles?.join(', ') }}</span>
+        </div>
+      </div>
+
+      <!-- Action Tools -->
+      <div class="workspace-actions">
+        <button class="btn-outline" (click)="downloadSampleExcelTemplate()" title="Download sample format">
+          <hugeicons-icon [icon]="Download01Icon" size="16" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+          <span>Excel Template</span>
+        </button>
+
+        <button class="btn-outline" (click)="exportCurrentStudentList()" [disabled]="filteredStudents().length === 0" title="Export candidates list">
+          <hugeicons-icon [icon]="Download01Icon" size="16" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+          <span>Export Excel</span>
+        </button>
+
+        <button class="btn-primary-ai" (click)="openExcelImportModal()">
+          <hugeicons-icon [icon]="Upload01Icon" size="16" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+          <span>Upload Students Excel</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- ROUND NAVIGATION TABS & FILTER TOOLBAR                                -->
+    <!-- ===================================================================== -->
+    <div class="pipeline-tabs-bar">
+      <div class="round-tabs-scroll">
+        <!-- All Candidates Tab -->
+        <button 
+          class="round-tab" 
+          [class.active]="selectedRoundTab() === 'all'" 
+          (click)="selectedRoundTab.set('all')"
+        >
+          <span>All Candidates</span>
+          <span class="tab-badge">{{ students().length }}</span>
+        </button>
+
+        <!-- Dynamic Round Tabs -->
+        <button 
+          class="round-tab" 
+          *ngFor="let round of selectedDrive().rounds" 
+          [class.active]="selectedRoundTab() === round.order" 
+          (click)="selectedRoundTab.set(round.order)"
+        >
+          <span>Round {{ round.order }}: {{ round.name }}</span>
+          <span class="hirepro-tab-indicator" *ngIf="round.isHireProLinked" title="HirePro Assessment Linked">
+            <hugeicons-icon [icon]="Link01Icon" size="11" [strokeWidth]="2.5" color="#2563eb"></hugeicons-icon>
+            HirePro
+          </span>
+          <!-- Dynamic live count of students in this round -->
+          <span class="tab-badge">
+            {{ getRoundCandidateCount(round.order) }}
+          </span>
+        </button>
+      </div>
+
+      <!-- Search & Status Filter -->
+      <div class="pipeline-filters-right">
+        <!-- Status Filter Pills -->
+        <div class="status-chip-group">
+          <button class="chip-filter" [class.active]="selectedStatusTab() === 'all'" (click)="selectedStatusTab.set('all')">All</button>
+          <button class="chip-filter" [class.active]="selectedStatusTab() === 'Active'" (click)="selectedStatusTab.set('Active')">Active</button>
+          <button class="chip-filter" [class.active]="selectedStatusTab() === 'Selected'" (click)="selectedStatusTab.set('Selected')">Selected</button>
+          <button class="chip-filter" [class.active]="selectedStatusTab() === 'Rejected'" (click)="selectedStatusTab.set('Rejected')">Rejected</button>
+        </div>
+
+        <div class="search-box sm">
+          <hugeicons-icon [icon]="Search01Icon" size="14" [strokeWidth]="1.5" color="#94a3b8"></hugeicons-icon>
+          <input 
+            type="text" 
+            placeholder="Search candidate name, roll, email..." 
+            [ngModel]="studentSearch()" 
+            (ngModelChange)="studentSearch.set($event)"
+          />
+        </div>
+      </div>
+    </div>
+
+    <!-- Minimal & Professional HirePro Info Strip -->
+    <div class="hirepro-exam-strip" *ngIf="getSelectedRoundHireProInfo() as hpInfo">
+      <div class="strip-lead">
+        <hugeicons-icon [icon]="Link01Icon" size="13" [strokeWidth]="2.2" color="#2563eb"></hugeicons-icon>
+        <span class="strip-round-tag">HirePro • {{ hpInfo.roundName }}</span>
+      </div>
+      <div class="strip-divider"></div>
+      <div class="strip-mappings">
+        <span class="mapping-item" *ngFor="let m of hpInfo.mappings; let last = last">
+          <span class="role-lbl">{{ m.role }}</span>
+          <span class="arrow-sym">→</span>
+          <span class="exam-lbl">{{ m.examTitle }}</span>
+          <span class="item-dot" *ngIf="!last">•</span>
+        </span>
+      </div>
+    </div>
+
+    <!-- Bulk Actions Toolbar (Shown when rows selected) -->
+    <div class="bulk-actions-banner" *ngIf="selectedStudentIds().length > 0">
+      <div class="bulk-left">
+        <span><strong>{{ selectedStudentIds().length }}</strong> candidate(s) selected</span>
+        <button class="btn-bulk-clear" (click)="selectedStudentIds.set([])">Deselect all</button>
+      </div>
+      <div class="bulk-right">
+        <button class="btn-bulk-promote" (click)="bulkPromoteSelected()">
+          <hugeicons-icon [icon]="CheckmarkCircle02Icon" size="14" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+          <span>Promote to Next Round</span>
+        </button>
+        <button class="btn-bulk-onboard" (click)="bulkOnboardSelected()" style="background: #0284c7; color: white; border: none; border-radius: 8px; padding: 6px 12px; display: inline-flex; align-items: center; gap: 6px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+          <hugeicons-icon [icon]="UserIcon" size="14" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+          <span>Onboard Selected</span>
+        </button>
+        <button class="btn-bulk-reject" (click)="bulkRejectSelected()">
+          <hugeicons-icon [icon]="CancelCircleIcon" size="14" [strokeWidth]="2" color="#dc2626"></hugeicons-icon>
+          <span>Reject Selected</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- ===================================================================== -->
+    <!-- CANDIDATES TABLE OR EMPTY STATE                                       -->
+    <!-- ===================================================================== -->
+    <!-- Loading State for Students -->
+    <div class="loading-state-card" *ngIf="isLoading()">
+      <div class="spinner"></div>
+      <p>Loading Candidates...</p>
+    </div>
+
+    <div class="candidates-table-card" *ngIf="!isLoading() && students().length > 0">
+      <table class="candidates-table">
+        <thead>
+          <tr>
+            <th class="th-checkbox">
+              <input 
+                type="checkbox" 
+                [checked]="isAllEligibleSelected()" 
+                (change)="toggleSelectAllStudents($event)"
+                title="Select all form-submitted candidates"
+              />
+            </th>
+            <th>Roll Number</th>
+            <th>Candidate Details</th>
+            <th>Contact</th>
+            <th>Branch & Degree</th>
+            <th>CGPA</th>
+            <th>Current Stage</th>
+            <th>Status</th>
+            <th class="th-actions">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let student of filteredStudents()" [class.selected]="isStudentSelected(student._id)">
+            <td class="td-checkbox">
+              <input 
+                type="checkbox" 
+                [checked]="isStudentSelected(student._id)" 
+                [disabled]="!student.isFormSubmitted"
+                [class.disabled-cb]="!student.isFormSubmitted"
+                (change)="toggleStudentSelection(student)"
+                [title]="student.isFormSubmitted ? 'Select candidate' : 'Cannot select: Application form not submitted'"
+              />
+            </td>
+            <td>
+              <span class="roll-number-badge">{{ student.rollNumber }}</span>
+            </td>
+            <td>
+              <div class="candidate-identity">
+                <strong class="candidate-name">{{ student.fullName }}</strong>
+                <span class="candidate-dob" *ngIf="student.dob">DOB: {{ student.dob | date:'mediumDate' }}</span>
+                <div class="candidate-chips-row" *ngIf="getStudentDisplayRole(student) || student.dob">
+                  <span class="candidate-role-tag" *ngIf="getStudentDisplayRole(student)" [title]="getStudentDisplayRole(student)">
+                    {{ getStudentDisplayRole(student) }}
+                  </span>
+                  <span class="form-status-pill" [class.submitted]="student.isFormSubmitted" [class.pending]="!student.isFormSubmitted" [title]="student.isFormSubmitted ? 'Application form submitted' : 'Application form not submitted'">
+                    {{ student.isFormSubmitted ? '✓ Form Filled' : 'Form Pending' }}
+                  </span>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="contact-stack">
+                <span class="contact-email">{{ student.email }}</span>
+                <span class="contact-phone" *ngIf="student.phone">{{ student.phone }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="academic-stack">
+                <span class="dept-text">{{ student.department || '—' }}</span>
+                <span class="degree-sub">{{ student.degree }}</span>
+              </div>
+            </td>
+            <td>
+              <span class="cgpa-pill" *ngIf="student.cgpa">{{ student.cgpa }}</span>
+              <span *ngIf="!student.cgpa">—</span>
+            </td>
+            <td>
+              <div class="stage-pill-box">
+                <span class="stage-num">R{{ student.currentRoundOrder }}</span>
+                <span class="stage-name" title="{{ student.currentRoundName }}">{{ student.currentRoundName }}</span>
+              </div>
+            </td>
+            <td>
+              <span class="overall-status-pill" [ngClass]="student.overallStatus?.toLowerCase()">
+                <span class="status-dot"></span>
+                {{ student.overallStatus }}
+              </span>
+            </td>
+            <td class="td-actions">
+              <div class="action-buttons-group">
+                <!-- Quick Promote (if active) -->
+                <button 
+                  class="btn-action-icon promote" 
+                  *ngIf="student.overallStatus === 'Active'" 
+                  [disabled]="!student.isFormSubmitted"
+                  [class.disabled-btn]="!student.isFormSubmitted"
+                  (click)="promoteStudent(student)" 
+                  [title]="student.isFormSubmitted ? 'Promote to Next Round' : 'Cannot promote: Candidate has not submitted the application form'"
+                >
+                  <hugeicons-icon [icon]="CheckmarkCircle02Icon" size="16" [strokeWidth]="2" [color]="student.isFormSubmitted ? '#059669' : '#94a3b8'"></hugeicons-icon>
+                </button>
+
+                <!-- Quick Reject (if active) -->
+                <button 
+                  class="btn-action-icon reject" 
+                  *ngIf="student.overallStatus === 'Active'" 
+                  (click)="rejectStudent(student)" 
+                  title="Mark Rejected"
+                >
+                  <hugeicons-icon [icon]="CancelCircleIcon" size="16" [strokeWidth]="2" color="#dc2626"></hugeicons-icon>
+                </button>
+
+                <!-- Onboard as Intern (when student cleared last round / is Selected) -->
+                <button 
+                  class="btn-action-icon onboard" 
+                  *ngIf="student.overallStatus === 'Selected' && !student.isOnboarded" 
+                  (click)="onboardStudentAsIntern(student)" 
+                  title="Onboard candidate as Intern"
+                  style="color: #0284c7; background: #e0f2fe; border: 1px solid #bae6fd; border-radius: 6px; padding: 4px;"
+                >
+                  <hugeicons-icon [icon]="UserIcon" size="16" [strokeWidth]="2" color="#0284c7"></hugeicons-icon>
+                </button>
+
+                <!-- Onboarded Tag -->
+                <span class="onboarded-tag-inline" *ngIf="student.isOnboarded" title="Onboarded to Interns" style="display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 12px; color: #065f46; font-size: 0.72rem; font-weight: 700;">
+                  <hugeicons-icon [icon]="CheckmarkCircle02Icon" size="12" [strokeWidth]="2" color="#059669"></hugeicons-icon>
+                  <span>Onboarded</span>
+                  <span *ngIf="student.internId" style="opacity: 0.85; font-size: 0.68rem; margin-left: 2px;">({{ student.internId }})</span>
+                </span>
+
+                <!-- Details / History -->
+                <button class="btn-action-icon view" (click)="viewStudentDetails(student)" title="View Evaluation History">
+                  <hugeicons-icon [icon]="File01Icon" size="16" [strokeWidth]="1.8" color="#64748b"></hugeicons-icon>
+                </button>
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Empty State for Students inside Drive -->
+    <div class="empty-state-card excel-empty" *ngIf="!isLoading() && students().length === 0">
+      <div class="empty-icon-circle">
+        <hugeicons-icon [icon]="Upload01Icon" size="48" [strokeWidth]="1.5" color="#94a3b8"></hugeicons-icon>
+      </div>
+      <h3>No Student Candidates Uploaded</h3>
+      <p>Upload your campus placement candidate roster as an Excel (.xlsx / .csv) file to map attributes and begin interview round evaluations.</p>
+      
+      <div class="empty-actions-row">
+        <button class="btn-outline" (click)="downloadSampleExcelTemplate()">
+          <hugeicons-icon [icon]="Download01Icon" size="16" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+          <span>Download Sample Excel</span>
+        </button>
+        
+        <button class="btn-primary-ai" (click)="openExcelImportModal()">
+          <hugeicons-icon [icon]="Upload01Icon" size="16" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+          <span>Upload Students Excel</span>
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: ADD COLLEGE ONBOARDING                                             -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" *ngIf="showAddCollegeModal()">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-flex">
+          <div>
+            <h3>Onboard Partner College</h3>
+            <p>Enter institution credentials, primary placement officer, and upload documents.</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" (click)="closeAddCollegeModal()">×</button>
+      </div>
+
+      <div class="modal-body form-grid-scroll">
+        <!-- Section: Basic Information -->
+        <div class="form-section-title">Institution Profile</div>
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>College Name <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="collegeForm.name" placeholder="e.g. National Institute of Technology" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Affiliated University (Optional)</label>
+            <input type="text" [(ngModel)]="collegeForm.university" placeholder="e.g. Anna University" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Campus Address <span class="required">*</span></label>
+          <textarea [(ngModel)]="collegeForm.address" rows="2" placeholder="Full street address, district, state, pin code"></textarea>
+        </div>
+
+        <!-- Section: Placement Officer -->
+        <div class="form-section-title">Placement Officer Details</div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Officer Full Name <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="collegeForm.officerName" placeholder="e.g. Dr. K. Rajesh" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Designation</label>
+            <input type="text" [(ngModel)]="collegeForm.officerDesignation" placeholder="e.g. Head - Training & Placement" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Official Email ID <span class="required">*</span></label>
+            <input type="email" [(ngModel)]="collegeForm.officerEmail" placeholder="placement@college.edu" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Mobile Number <span class="required">*</span></label>
+            <input type="tel" [(ngModel)]="collegeForm.officerPhone" placeholder="+91 98765 43210" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Alternate / WhatsApp</label>
+            <input type="tel" [(ngModel)]="collegeForm.officerAlternatePhone" placeholder="Optional phone" />
+          </div>
+        </div>
+
+        <!-- Section: Images (Downsampled via Sharp) -->
+        <div class="form-section-title">Media & Branding (Optimized via Sharp)</div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>College Logo (Resized to 256x256 WebP)</label>
+            <input type="file" (change)="onLogoSelected($event)" accept="image/*" />
+            <div class="preview-box" *ngIf="logoPreview()">
+              <img [src]="logoPreview()" alt="Logo Preview" />
+            </div>
+          </div>
+          <div class="form-group flex-1">
+            <label>College Banner Image (Resized to 1200x600 WebP)</label>
+            <input type="file" (change)="onBannerSelected($event)" accept="image/*" />
+            <div class="preview-box banner" *ngIf="bannerPreview()">
+              <img [src]="bannerPreview()" alt="Banner Preview" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: MOU Documentation -->
+        <div class="form-section-title">MOU & Legal Agreements</div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Upload Signed MOU Document (Stored Compressed Base64)</label>
+            <input type="file" (change)="onMouFileSelected($event)" accept=".pdf,.doc,.docx,image/*" />
+            <small class="helper-text">Compressed with zlib in MongoDB for instant verification.</small>
+          </div>
+          <div class="form-group flex-1">
+            <label>MOU Google Drive / Cloud Link (Optional)</label>
+            <input type="url" [(ngModel)]="collegeForm.mouDriveLink" placeholder="https://drive.google.com/..." />
+          </div>
+        </div>
+
+        <!-- Section: Initial Academic Year -->
+        <div class="form-section-title">Initial Academic Year</div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Academic Year String</label>
+            <input type="text" [(ngModel)]="collegeForm.initialAcademicYear" placeholder="2025-2026" />
+          </div>
+          <div class="form-group flex-2">
+            <label>Notes / Batch Remarks</label>
+            <input type="text" [(ngModel)]="collegeForm.initialYearNotes" placeholder="e.g. 2026 Graduating Batch" />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeAddCollegeModal()" [disabled]="isLoading()">Cancel</button>
+        <button class="btn-primary-ai" (click)="submitAddCollege()" [disabled]="isLoading()">
+          <span *ngIf="!isLoading()">Complete Onboarding</span>
+          <span *ngIf="isLoading()">Processing Images...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: EDIT COLLEGE DETAILS                                               -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" *ngIf="showEditCollegeModal()">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-flex">
+          <div>
+            <h3>Edit Partner College</h3>
+            <p>Update institution profile, placement officer contact details, and documents.</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" (click)="closeEditCollegeModal()">×</button>
+      </div>
+
+      <div class="modal-body form-grid-scroll">
+        <!-- Section: Basic Information -->
+        <div class="form-section-title">Institution Profile</div>
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>College Name <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="editCollegeForm.name" placeholder="e.g. National Institute of Technology" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Affiliated University</label>
+            <input type="text" [(ngModel)]="editCollegeForm.university" placeholder="e.g. Anna University" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Status</label>
+            <select [(ngModel)]="editCollegeForm.status">
+              <option value="Active">Active</option>
+              <option value="Inactive">Inactive</option>
+              <option value="Archived">Archived</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Campus Address <span class="required">*</span></label>
+          <textarea [(ngModel)]="editCollegeForm.address" rows="2" placeholder="Full street address, district, state, pin code"></textarea>
+        </div>
+
+        <!-- Section: Placement Officer -->
+        <div class="form-section-title">Placement Officer Details</div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Officer Full Name <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="editCollegeForm.officerName" placeholder="e.g. Dr. K. Rajesh" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Designation</label>
+            <input type="text" [(ngModel)]="editCollegeForm.officerDesignation" placeholder="e.g. Head - Training & Placement" />
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Official Email ID <span class="required">*</span></label>
+            <input type="email" [(ngModel)]="editCollegeForm.officerEmail" placeholder="placement@college.edu" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Mobile Number <span class="required">*</span></label>
+            <input type="tel" [(ngModel)]="editCollegeForm.officerPhone" placeholder="+91 98765 43210" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Alternate / WhatsApp</label>
+            <input type="tel" [(ngModel)]="editCollegeForm.officerAlternatePhone" placeholder="Optional phone" />
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Officer LinkedIn Profile (Optional)</label>
+          <input type="url" [(ngModel)]="editCollegeForm.officerLinkedin" placeholder="https://linkedin.com/in/..." />
+        </div>
+
+        <!-- Section: Images (Downsampled via Sharp) -->
+        <div class="form-section-title">Media & Branding</div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Update College Logo</label>
+            <input type="file" (change)="onEditLogoSelected($event)" accept="image/*" />
+            <div class="preview-box" *ngIf="editLogoPreview()">
+              <img [src]="editLogoPreview()" alt="Logo Preview" />
+            </div>
+          </div>
+          <div class="form-group flex-1">
+            <label>Update College Banner Image</label>
+            <input type="file" (change)="onEditBannerSelected($event)" accept="image/*" />
+            <div class="preview-box banner" *ngIf="editBannerPreview()">
+              <img [src]="editBannerPreview()" alt="Banner Preview" />
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: MOU Documentation -->
+        <div class="form-section-title">MOU & Legal Agreements</div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Upload New Signed MOU Document</label>
+            <input type="file" (change)="onEditMouFileSelected($event)" accept=".pdf,.doc,.docx,image/*" />
+            <small class="helper-text">Leave blank to retain current MOU file.</small>
+          </div>
+          <div class="form-group flex-1">
+            <label>MOU Google Drive / Cloud Link</label>
+            <input type="url" [(ngModel)]="editCollegeForm.mouDriveLink" placeholder="https://drive.google.com/..." />
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeEditCollegeModal()" [disabled]="isUpdatingCollege()">Cancel</button>
+        <button class="btn-primary-ai" (click)="submitUpdateCollege()" [disabled]="isUpdatingCollege()">
+          <span *ngIf="!isUpdatingCollege()">Save Changes</span>
+          <span *ngIf="isUpdatingCollege()">Saving...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: ADD ACADEMIC YEAR                                                  -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" *ngIf="showAddYearModal()">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <div class="modal-title-flex">
+          <div>
+            <h3>Add Academic Hiring Year</h3>
+            <p>Initialize a new academic calendar batch for {{ selectedCollege()?.name }}.</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" (click)="closeAddYearModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-group">
+          <label>Academic Year <span class="required">*</span></label>
+          <input type="text" [(ngModel)]="yearForm.year" placeholder="e.g. 2025-2026" />
+        </div>
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Start Date (Optional)</label>
+            <input type="date" [(ngModel)]="yearForm.startDate" />
+          </div>
+          <div class="form-group flex-1">
+            <label>End Date (Optional)</label>
+            <input type="date" [(ngModel)]="yearForm.endDate" />
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Batch Remarks / Notes</label>
+          <input type="text" [(ngModel)]="yearForm.notes" placeholder="e.g. Winter & Spring Hiring Drive" />
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeAddYearModal()">Cancel</button>
+        <button class="btn-primary-ai" (click)="submitAddYear()" [disabled]="isLoading()">Add Academic Year</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: CREATE CAMPUS DRIVE                                                -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" *ngIf="showCreateDriveModal()">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-flex">
+          <div>
+            <h3>Create Campus Hiring Drive</h3>
+            <p>Configure role profiles, schedule dates, and customize the sequence of interview rounds.</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" (click)="closeCreateDriveModal()">×</button>
+      </div>
+
+      <div class="modal-body form-grid-scroll">
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>Drive Title <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="driveForm.title" placeholder="e.g. Engineering Campus Recruitment 2025" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Academic Year <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="driveForm.academicYear" placeholder="2025-2026" />
+          </div>
+        </div>
+
+        <!-- Multi-Role Selection from Company Settings -->
+        <div class="form-group">
+          <label>Target Roles (Choose Multiple from Company Settings) <span class="required">*</span></label>
+          <div class="roles-selection-chips">
+            <button 
+              type="button" 
+              class="role-select-chip" 
+              *ngFor="let role of availableCompanyRoles()"
+              [class.selected]="isRoleSelected(role)"
+              (click)="toggleRoleSelection(role)"
+            >
+              <span class="check-box-icon" *ngIf="isRoleSelected(role)">✓</span>
+              <span>{{ role }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Start Date <span class="required">*</span></label>
+            <input type="date" [(ngModel)]="driveForm.startDate" />
+          </div>
+          <div class="form-group flex-1">
+            <label>End Date <span class="required">*</span></label>
+            <input type="date" [(ngModel)]="driveForm.endDate" />
+          </div>
+        </div>
+
+        <!-- Configurable & Reorderable Interview Rounds -->
+        <div class="form-section-title">Interview Rounds Pipeline (Order & Enable/Disable)</div>
+        <p class="rounds-desc">Use the Up and Down controls to adjust round order. Candidates will progress sequentially through these rounds.</p>
+        
+        <div class="rounds-builder-list">
+          <div class="round-builder-item-wrapper" *ngFor="let round of driveForm.rounds; let idx = index">
+            <div class="round-builder-item" [class.linked-active]="round.isHireProLinked">
+              <div class="item-left">
+                <input type="checkbox" [(ngModel)]="round.isActive" id="round_{{ idx }}" />
+                <label for="round_{{ idx }}" class="round-order-num">Round {{ idx + 1 }}</label>
+                <input type="text" [(ngModel)]="round.name" class="round-name-input" />
+              </div>
+
+              <div class="item-actions">
+                <!-- Link with HirePro Toggle Button: Available only on Round 2+ (Not Resume Screening) -->
+                <button 
+                  *ngIf="round.order > 1 && !round.name.toLowerCase().includes('resume')"
+                  type="button" 
+                  class="btn-hirepro-toggle" 
+                  [class.active]="round.isHireProLinked"
+                  (click)="toggleHireProLink(idx)"
+                  [title]="round.isHireProLinked ? 'HirePro Assessment Enabled' : 'Link with HirePro'">
+                  <hugeicons-icon [icon]="Link01Icon" size="13" [strokeWidth]="2" [color]="round.isHireProLinked ? '#2563eb' : '#64748b'"></hugeicons-icon>
+                  <span>{{ round.isHireProLinked ? 'Linked with HirePro' : 'Link with HirePro' }}</span>
+                </button>
+                <span class="round-badge-screening" *ngIf="round.order === 1 || round.name.toLowerCase().includes('resume')">
+                  Resume Screening
+                </span>
+
+                <button 
+                  type="button" 
+                  class="btn-order-arrow" 
+                  (click)="moveRoundUp(idx)" 
+                  [disabled]="idx === 0" 
+                  title="Move Up"
+                >
+                  <hugeicons-icon [icon]="ArrowUp01Icon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+                </button>
+
+                <button 
+                  type="button" 
+                  class="btn-order-arrow" 
+                  (click)="moveRoundDown(idx)" 
+                  [disabled]="idx === driveForm.rounds.length - 1" 
+                  title="Move Down"
+                >
+                  <hugeicons-icon [icon]="ArrowDown01Icon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+                </button>
+
+                <button type="button" class="btn-delete-round" (click)="removeRound(idx)" title="Remove Round">
+                  <hugeicons-icon [icon]="Delete01Icon" size="14" [strokeWidth]="1.8" color="#dc2626"></hugeicons-icon>
+                </button>
+              </div>
+            </div>
+
+            <!-- Role-to-Exam Mapping Panel for this Round -->
+            <div class="hirepro-mapping-container" *ngIf="round.isHireProLinked">
+              <div class="hirepro-mapping-header">
+                <div class="hirepro-mapping-title">
+                  <span class="hirepro-tag">HirePro Assessment Mapping</span>
+                  <span class="hirepro-subtitle">Select the HirePro exam for each target role:</span>
+                </div>
+                <div class="hirepro-status-indicator" *ngIf="isLoadingHireProExams()">
+                  <span class="loading-dot"></span> Loading HirePro exams...
+                </div>
+              </div>
+
+              <!-- When no roles selected yet in drive -->
+              <div class="hirepro-no-roles" *ngIf="driveForm.roles.length === 0">
+                <hugeicons-icon [icon]="FilterIcon" size="14" [strokeWidth]="1.8" color="#d97706"></hugeicons-icon>
+                <span>Please select one or more hiring roles above first to map exams.</span>
+              </div>
+
+              <!-- Roles and exam selectors -->
+              <div class="hirepro-roles-grid" *ngIf="driveForm.roles.length > 0">
+                <div class="hirepro-role-card" *ngFor="let role of driveForm.roles">
+                  <div class="role-title-badge">
+                    <hugeicons-icon [icon]="UserIcon" size="12" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+                    <span>{{ role }}</span>
+                  </div>
+                  <div class="role-exam-select-wrap">
+                    <select 
+                      class="role-exam-select"
+                      [ngModel]="getExamMappingForRole(round, role)"
+                      (ngModelChange)="setExamMappingForRole(round, role, $event)">
+                      <option value="">-- Choose HirePro Exam --</option>
+                      <option *ngFor="let ex of hireProExams()" [value]="ex._id">
+                        {{ ex.title }} ({{ ex.totalDuration }}m • {{ ex.totalMarks }} marks)
+                      </option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Custom Round -->
+        <div class="add-custom-round-row">
+          <input 
+            type="text" 
+            placeholder="Add custom interview round name..." 
+            [ngModel]="customRoundName()" 
+            (ngModelChange)="customRoundName.set($event)" 
+          />
+          <button type="button" class="btn-secondary-sm" (click)="addCustomRound()">
+            <hugeicons-icon [icon]="PlusSignIcon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+            <span>Add Round</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeCreateDriveModal()">Cancel</button>
+        <button class="btn-primary-ai" (click)="submitCreateDrive()" [disabled]="isLoading()">Create Drive</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: EXCEL IMPORT & ATTRIBUTE MAPPING                                  -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" *ngIf="showExcelImportModal()">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-header">
+        <div class="modal-title-flex">
+          <div>
+            <h3>Excel Student Roster & Attribute Mapping</h3>
+            <p>Upload Excel/CSV sheet, align headers with system fields, and preview live before saving.</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" (click)="closeExcelImportModal()">×</button>
+      </div>
+
+      <div class="modal-body form-grid-scroll">
+        
+        <!-- Step 1: File Dropzone -->
+        <div class="excel-upload-zone" *ngIf="excelHeaders().length === 0">
+          <hugeicons-icon [icon]="Upload01Icon" size="32" [strokeWidth]="1.8" color="#64748b"></hugeicons-icon>
+          <h4>Choose Excel / CSV File</h4>
+          <p>Accepts .xlsx, .xls, and .csv formats containing student candidate rosters.</p>
+          <input type="file" (change)="onExcelFileSelected($event)" accept=".xlsx, .xls, .csv" class="file-input-cover" />
+          <div *ngIf="isParsingExcel()" class="parsing-spinner">Parsing Excel Headers...</div>
+        </div>
+
+        <!-- Step 2: Attribute Mapping Grid -->
+        <div class="mapping-container" *ngIf="excelHeaders().length > 0">
+          <div class="mapping-header-info">
+            <span class="file-summary-badge">
+              <strong>{{ excelRawRows().length }}</strong> Candidate Rows Detected
+            </span>
+            <button class="btn-text-reselect" (click)="excelHeaders.set([]); excelRawRows.set([])">
+              Upload Different File
+            </button>
+          </div>
+
+          <div class="mapping-grid">
+            
+            <!-- Roll Number -->
+            <div class="mapping-field-card required">
+              <div class="field-meta">
+                <label>Roll Number / Register No <span class="required">*</span></label>
+                <small>Unique candidate identifier</small>
+              </div>
+              <select [ngModel]="excelMapping().rollNumber" (ngModelChange)="updateMapping('rollNumber', $event)">
+                <option value="">-- Choose Column --</option>
+                <option *ngFor="let h of excelHeaders()" [value]="h">{{ h }}</option>
+              </select>
+            </div>
+
+            <!-- Full Name -->
+            <div class="mapping-field-card required">
+              <div class="field-meta">
+                <label>Student Full Name <span class="required">*</span></label>
+                <small>Candidate primary name</small>
+              </div>
+              <select [ngModel]="excelMapping().fullName" (ngModelChange)="updateMapping('fullName', $event)">
+                <option value="">-- Choose Column --</option>
+                <option *ngFor="let h of excelHeaders()" [value]="h">{{ h }}</option>
+              </select>
+            </div>
+
+            <!-- Email -->
+            <div class="mapping-field-card required">
+              <div class="field-meta">
+                <label>Email Address <span class="required">*</span></label>
+                <small>Interview invitations & alerts</small>
+              </div>
+              <select [ngModel]="excelMapping().email" (ngModelChange)="updateMapping('email', $event)">
+                <option value="">-- Choose Column --</option>
+                <option *ngFor="let h of excelHeaders()" [value]="h">{{ h }}</option>
+              </select>
+            </div>
+
+            <!-- Phone -->
+            <div class="mapping-field-card">
+              <div class="field-meta">
+                <label>Phone / Mobile</label>
+                <small>Contact number</small>
+              </div>
+              <select [ngModel]="excelMapping().phone" (ngModelChange)="updateMapping('phone', $event)">
+                <option value="">-- Choose Column --</option>
+                <option *ngFor="let h of excelHeaders()" [value]="h">{{ h }}</option>
+              </select>
+            </div>
+
+            <!-- Date of Birth -->
+            <div class="mapping-field-card">
+              <div class="field-meta">
+                <label>Date of Birth (DOB)</label>
+                <small>Candidate age verification</small>
+              </div>
+              <select [ngModel]="excelMapping().dob" (ngModelChange)="updateMapping('dob', $event)">
+                <option value="">-- Choose Column --</option>
+                <option *ngFor="let h of excelHeaders()" [value]="h">{{ h }}</option>
+              </select>
+            </div>
+
+            <!-- Department -->
+            <div class="mapping-field-card">
+              <div class="field-meta">
+                <label>Department / Branch</label>
+                <small>e.g. CSE, ECE, Mech</small>
+              </div>
+              <select [ngModel]="excelMapping().department" (ngModelChange)="updateMapping('department', $event)">
+                <option value="">-- Choose Column --</option>
+                <option *ngFor="let h of excelHeaders()" [value]="h">{{ h }}</option>
+              </select>
+            </div>
+
+            <!-- Degree -->
+            <div class="mapping-field-card">
+              <div class="field-meta">
+                <label>Degree / Course</label>
+                <small>e.g. B.Tech, M.Tech, MCA</small>
+              </div>
+              <select [ngModel]="excelMapping().degree" (ngModelChange)="updateMapping('degree', $event)">
+                <option value="">-- Choose Column --</option>
+                <option *ngFor="let h of excelHeaders()" [value]="h">{{ h }}</option>
+              </select>
+            </div>
+
+            <!-- CGPA -->
+            <div class="mapping-field-card">
+              <div class="field-meta">
+                <label>CGPA / Percentage</label>
+                <small>Academic performance score</small>
+              </div>
+              <select [ngModel]="excelMapping().cgpa" (ngModelChange)="updateMapping('cgpa', $event)">
+                <option value="">-- Choose Column --</option>
+                <option *ngFor="let h of excelHeaders()" [value]="h">{{ h }}</option>
+              </select>
+            </div>
+
+          </div>
+
+          <!-- Live 3-Row Preview Table -->
+          <div class="preview-section">
+            <div class="preview-title">Live Preview (First 3 Records with Applied Mapping)</div>
+            <div class="table-responsive">
+              <table class="preview-table">
+                <thead>
+                  <tr>
+                    <th>Roll Number</th>
+                    <th>Full Name</th>
+                    <th>DOB</th>
+                    <th>Email</th>
+                    <th>Phone</th>
+                    <th>Department</th>
+                    <th>CGPA</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let r of mappedPreviewRows()">
+                    <td><strong>{{ r.rollNumber }}</strong></td>
+                    <td>{{ r.fullName }}</td>
+                    <td>{{ r.dob }}</td>
+                    <td>{{ r.email }}</td>
+                    <td>{{ r.phone }}</td>
+                    <td>{{ r.department }}</td>
+                    <td><span class="cgpa-pill sm">{{ r.cgpa }}</span></td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Duplicate Conflict Policy -->
+          <div class="conflict-resolution-box">
+            <label class="conflict-label">If a student roll number already exists in this drive:</label>
+            <div class="radio-group">
+              <label class="radio-item">
+                <input type="radio" value="skip" [ngModel]="excelConflictResolution()" (ngModelChange)="excelConflictResolution.set($event)" />
+                <span>Skip duplicate rows (Keep existing evaluation progress)</span>
+              </label>
+              <label class="radio-item">
+                <input type="radio" value="update" [ngModel]="excelConflictResolution()" (ngModelChange)="excelConflictResolution.set($event)" />
+                <span>Update candidate details (Name, Contact, CGPA)</span>
+              </label>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeExcelImportModal()" [disabled]="isImportingStudents()">Cancel</button>
+        <button 
+          class="btn-primary-ai" 
+          [disabled]="excelHeaders().length === 0 || isImportingStudents()" 
+          (click)="confirmImportStudents()"
+        >
+          <span *ngIf="!isImportingStudents()">Import {{ excelRawRows().length }} Students</span>
+          <span *ngIf="isImportingStudents()">Importing Candidates...</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: STUDENT DETAILS & ROUND EVALUATION HISTORY                         -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" *ngIf="showStudentDetailsModal() && selectedStudent()">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-flex">
+          <div>
+            <h3>{{ selectedStudent().fullName }}</h3>
+            <p>{{ selectedStudent().rollNumber }} • {{ selectedStudent().department || 'Department' }}</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" (click)="closeStudentDetailsModal()">×</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Form One Status & Overall Status Bar -->
+        <div class="form-submission-header" style="display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 1rem;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span *ngIf="selectedStudent().isFormSubmitted" style="display: inline-flex; align-items: center; gap: 6px; color: #166534; font-size: 0.82rem; font-weight: 600;">
+              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #22c55e;"></span>
+              Candidate Form Submitted
+              <span *ngIf="selectedStudent().formSubmittedAt" style="color: #64748b; font-weight: 400;">
+                ({{ selectedStudent().formSubmittedAt | date:'medium' }})
+              </span>
+            </span>
+            <span *ngIf="!selectedStudent().isFormSubmitted" style="display: inline-flex; align-items: center; gap: 6px; color: #b45309; font-size: 0.82rem; font-weight: 600;">
+              <span style="display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #f59e0b;"></span>
+              Candidate Form Not Yet Submitted
+            </span>
+          </div>
+
+          <span class="overall-status-pill sm" [ngClass]="selectedStudent().overallStatus?.toLowerCase()">
+            {{ selectedStudent().overallStatus }}
+          </span>
+        </div>
+
+        <!-- Section: Candidate Information (Filled via Form One) -->
+        <div class="form-section-title" style="margin-top: 0; margin-bottom: 8px; font-weight: 700; font-size: 0.88rem; color: #0f172a;">
+          Candidate Details (Form Submission)
+        </div>
+
+        <div class="student-profile-snapshot" style="grid-template-columns: repeat(3, 1fr); margin-bottom: 1.25rem;">
+          <div class="snapshot-item">
+            <span class="lbl">Role Applied / Selected</span>
+            <span class="val" style="color: #0284c7;">
+              {{ selectedStudent().selectedRole || (selectedStudent().appliedRoles && selectedStudent().appliedRoles.length > 0 ? selectedStudent().appliedRoles.join(', ') : '—') }}
+            </span>
+          </div>
+          <div class="snapshot-item">
+            <span class="lbl">Email</span>
+            <span class="val">{{ selectedStudent().email || '—' }}</span>
+          </div>
+          <div class="snapshot-item">
+            <span class="lbl">Phone (WhatsApp)</span>
+            <span class="val">{{ selectedStudent().phone || '—' }}</span>
+          </div>
+
+          <div class="snapshot-item">
+            <span class="lbl">College / University</span>
+            <span class="val">{{ selectedStudent().collegeName || '—' }}</span>
+          </div>
+          <div class="snapshot-item">
+            <span class="lbl">Department</span>
+            <span class="val">{{ selectedStudent().department || '—' }}</span>
+          </div>
+          <div class="snapshot-item">
+            <span class="lbl">Degree / Qualification</span>
+            <span class="val">{{ selectedStudent().degree || '—' }}</span>
+          </div>
+
+          <div class="snapshot-item">
+            <span class="lbl">Graduation / Passing Year</span>
+            <span class="val">{{ selectedStudent().passingYear || '—' }}</span>
+          </div>
+          <div class="snapshot-item">
+            <span class="lbl">CGPA / Percentage</span>
+            <span class="val">{{ selectedStudent().cgpa || '—' }}</span>
+          </div>
+          <div class="snapshot-item">
+            <span class="lbl">Location (Place, District)</span>
+            <span class="val">{{ selectedStudent().location || '—' }}</span>
+          </div>
+
+          <div class="snapshot-item">
+            <span class="lbl">Gender</span>
+            <span class="val">{{ selectedStudent().gender || '—' }}</span>
+          </div>
+          <div class="snapshot-item">
+            <span class="lbl">Date of Birth</span>
+            <span class="val">{{ selectedStudent().dob ? (selectedStudent().dob | date:'mediumDate') : '—' }}</span>
+          </div>
+          <div class="snapshot-item">
+            <span class="lbl">LinkedIn Profile</span>
+            <span class="val">
+              <a *ngIf="selectedStudent().linkedin" [href]="selectedStudent().linkedin" target="_blank" style="color: #0284c7; text-decoration: underline; display: inline-flex; align-items: center; gap: 4px;">
+                View Profile ↗
+              </a>
+              <span *ngIf="!selectedStudent().linkedin">—</span>
+            </span>
+          </div>
+        </div>
+
+        <!-- Section: Documents & Project Links -->
+        <div *ngIf="selectedStudent().resumeBase64 || getParsedProjectLinks(selectedStudent()).length > 0" style="margin-bottom: 1.25rem; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Documents & Live Project Links</div>
+          <div style="display: flex; flex-wrap: wrap; gap: 10px; align-items: center;">
+            <button 
+              *ngIf="selectedStudent().resumeBase64" 
+              type="button" 
+              (click)="downloadResume(selectedStudent())" 
+              style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0f172a; font-size: 0.82rem; font-weight: 600; cursor: pointer;"
+            >
+              <hugeicons-icon [icon]="File01Icon" size="16" [strokeWidth]="1.8" color="#0f172a"></hugeicons-icon>
+              <span>View Resume (PDF)</span>
+            </button>
+            <div *ngFor="let link of getParsedProjectLinks(selectedStudent()); let pIdx = index" style="display: inline-flex; align-items: center;">
+              <a [href]="link" target="_blank" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #ffffff; border: 1px solid #cbd5e1; border-radius: 8px; color: #0284c7; font-size: 0.82rem; font-weight: 600; text-decoration: none;">
+                <hugeicons-icon [icon]="Link01Icon" size="15" [strokeWidth]="1.8" color="#0284c7"></hugeicons-icon>
+                <span>Project {{ pIdx + 1 }}: {{ link }} ↗</span>
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Assessment Answers (if present) -->
+        <div *ngIf="hasAssessmentAnswers(selectedStudent())" style="margin-bottom: 1.25rem; padding: 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 12px;">
+          <div style="font-size: 0.75rem; font-weight: 700; text-transform: uppercase; color: #64748b; margin-bottom: 8px;">Assessment Answers</div>
+          <div style="display: flex; flex-direction: column; gap: 6px;">
+            <div *ngFor="let item of getParsedAssessmentAnswers(selectedStudent())" style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px;">
+              <div style="font-size: 0.75rem; color: #64748b; font-weight: 600;">{{ item.question }}</div>
+              <div style="font-size: 0.82rem; color: #0f172a; font-weight: 500; margin-top: 2px;">{{ item.answer }}</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-section-title" style="margin-bottom: 8px; font-weight: 700; font-size: 0.88rem; color: #0f172a;">Round-by-Round Evaluation Trail</div>
+        <div class="evaluation-trail-list">
+          <div class="trail-item" *ngFor="let h of selectedStudent().roundHistory">
+            <div class="trail-header">
+              <strong>Round {{ h.roundOrder }}: {{ h.roundName }}</strong>
+              <span class="trail-status-pill" [ngClass]="h.status?.toLowerCase()">{{ h.status }}</span>
+            </div>
+            <p class="trail-remarks" *ngIf="h.remarks">{{ h.remarks }}</p>
+            <span class="trail-time" *ngIf="h.evaluatedAt">{{ h.evaluatedAt | date:'medium' }}</span>
+          </div>
+          <div *ngIf="!selectedStudent().roundHistory || selectedStudent().roundHistory.length === 0" style="padding: 12px; text-align: center; color: #94a3b8; font-size: 0.82rem;">
+            No round evaluation history recorded yet.
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer" style="display: flex; justify-content: flex-end; gap: 10px;">
+        <button 
+          class="btn-primary-ai" 
+          *ngIf="selectedStudent().overallStatus === 'Selected' && !selectedStudent().isOnboarded"
+          (click)="onboardStudentAsIntern(selectedStudent())"
+        >
+          <hugeicons-icon [icon]="UserIcon" size="16" [strokeWidth]="2" color="#ffffff"></hugeicons-icon>
+          <span>Onboard as Intern</span>
+        </button>
+        <span class="onboarded-tag-inline" *ngIf="selectedStudent().isOnboarded" style="display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; background: #ecfdf5; border: 1px solid #a7f3d0; border-radius: 8px; color: #065f46; font-size: 0.85rem; font-weight: 700;">
+          <hugeicons-icon [icon]="CheckmarkCircle02Icon" size="16" [strokeWidth]="2" color="#059669"></hugeicons-icon>
+          <span>Already Onboarded as Intern</span>
+          <span *ngIf="selectedStudent().internId" style="opacity: 0.9; font-size: 0.8rem; margin-left: 4px;">({{ selectedStudent().internId }})</span>
+        </span>
+        <button class="btn-secondary" (click)="closeStudentDetailsModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+

@@ -151,16 +151,23 @@ export class CertificateSettings implements OnInit {
   // ── Fetch ──────────────────────────────────────────────────────────────────
   fetchSettings() {
     this.isLoading = true;
+
+    // Step 1: Load lightweight communication settings from the fast /company endpoint
     this.apiService.getCompanySettings().subscribe({
       next: (res: any) => {
-        if (res.success) {
-          if (res.settings && res.settings.communication) {
-            this.emailLogoUrl = res.settings.communication.emailLogoUrl || '';
-            this.emailSignatureUrl = res.settings.communication.emailSignatureUrl || '';
-          }
+        if (res.success && res.settings?.communication) {
+          this.emailLogoUrl = res.settings.communication.emailLogoUrl || '';
+          this.emailSignatureUrl = res.settings.communication.emailSignatureUrl || '';
+        }
+      },
+      error: (err) => console.error('Failed to fetch communication settings', err)
+    });
 
-          if (res.offerLetterSettings) {
-            const saved = res.offerLetterSettings.documentTemplates || {};
+    // Step 2: Lazily load the 2.2MB offer letter / certificate templates from dedicated endpoint
+    this.apiService.getOfferLetterSettings().subscribe({
+      next: (res: any) => {
+        if (res.success && res.offerLetterSettings) {
+          const saved = res.offerLetterSettings.documentTemplates || {};
           const types = Object.keys(this.documentTemplates);
 
           types.forEach(type => {
@@ -194,12 +201,11 @@ export class CertificateSettings implements OnInit {
           const { documentTemplates: _ignored, ...rest } = res.offerLetterSettings;
           this.otherSettings = rest;
         }
-      }
-      this.isLoading = false;
-      this.cdr.detectChanges();
-    },
+        this.isLoading = false;
+        this.cdr.detectChanges();
+      },
       error: (err) => {
-        console.error('Failed to fetch settings', err);
+        console.error('Failed to fetch offer letter settings', err);
         this.isLoading = false;
         this.cdr.detectChanges();
       }

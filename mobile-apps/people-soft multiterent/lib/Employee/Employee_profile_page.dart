@@ -689,6 +689,57 @@ class _EmployeeProfilePageState extends State<EmployeeProfilePage> {
                       ],
                     ),
                   ),
+                  const SizedBox(height: 20),
+
+                  _FadeInWrapper(
+                    delay: 800,
+                    child: _SectionContainer(
+                      children: [
+                        const _SectionHeader(title: 'Bank & Statutory Details'),
+                        const SizedBox(height: 20),
+                        _InfoRow(
+                          Icons.credit_card_rounded,
+                          'PAN Number',
+                          data['panNumber'] ?? '',
+                        ),
+                        _InfoRow(
+                          Icons.badge_rounded,
+                          'UAN Number',
+                          data['uanNumber'] ?? '',
+                        ),
+                        _InfoRow(
+                          Icons.health_and_safety_rounded,
+                          'ESI Number',
+                          data['esiNumber'] ?? '',
+                        ),
+                        _InfoRow(
+                          Icons.account_balance_rounded,
+                          'Bank Name',
+                          data['bankDetails']?['bankName'] ?? '',
+                        ),
+                        _InfoRow(
+                          Icons.pin_rounded,
+                          'Account Number',
+                          data['bankDetails']?['accountNumber'] ?? '',
+                        ),
+                        _InfoRow(
+                          Icons.password_rounded,
+                          'IFSC Code',
+                          data['bankDetails']?['ifscCode'] ?? '',
+                        ),
+                        _InfoRow(
+                          Icons.person_pin_rounded,
+                          'A/C Holder',
+                          data['bankDetails']?['accountHolderName'] ?? '',
+                        ),
+                        _InfoRow(
+                          Icons.location_city_rounded,
+                          'Branch Name',
+                          data['bankDetails']?['branchName'] ?? '',
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(height: 8),
                 ],
               ),

@@ -294,9 +294,7 @@ exports.hrReview = async (req, res) => {
       const customSignature = company?.settings?.communication?.emailSignatureUrl;
       const customLogo = company?.settings?.communication?.emailLogoUrl;
 
-      const signatureHtml = customSignature 
-        ? `<div style="margin-top: 30px;"><img src="${customSignature}" alt="Company Signature" style="max-height: 80px; display: block;" /></div>`
-        : getSignature(LOGO_URL);
+      const signatureHtml = getSignature(customSignature);
 
       const logoHtml = customLogo
         ? `<div style="margin-bottom: 20px;"><img src="${customLogo}" alt="Company Logo" style="max-height: 60px; display: block;" /></div>`
@@ -348,9 +346,7 @@ exports.hrReview = async (req, res) => {
       const customSignature = company?.settings?.communication?.emailSignatureUrl;
       const customLogo = company?.settings?.communication?.emailLogoUrl;
       
-      const signatureHtml = customSignature 
-        ? `<div style="margin-top: 30px;"><img src="${customSignature}" alt="Company Signature" style="max-height: 80px; display: block;" /></div>`
-        : getSignature(LOGO_URL);
+      const signatureHtml = getSignature(customSignature);
 
       const logoHtml = customLogo
         ? `<div style="margin-bottom: 20px;"><img src="${customLogo}" alt="Company Logo" style="max-height: 60px; display: block;" /></div>`

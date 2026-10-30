@@ -48,7 +48,7 @@ export class EmployeeDetails implements OnInit {
       event.target.nextElementSibling.style.display = 'flex';
     }
   }
-  
+
   employeeId = signal<string>('');
   employee = signal<any>(null);
   isLoading = signal(true);
@@ -58,186 +58,290 @@ export class EmployeeDetails implements OnInit {
   terminationReason = signal('');
   userRole = signal<string | null>(localStorage.getItem('user_role'));
 
+  // LMS Courses Mapping State
+  assignedCourses = signal<any[]>([]);
+  availableCourses = signal<any[]>([]);
+  showAssignCourseModal = signal(false);
+  selectedCourseIdToAssign = signal('');
+  isAssigningCourse = signal(false);
+
   ngOnInit() {
     this.employeeId.set(this.route.snapshot.paramMap.get('id') || '');
     this.fetchDetails();
+    this.loadLMSCourses();
   }
+
+  loadLMSCourses() {
+      const actualId = this.employee()?._id || this.employeeId();
+      if(!actualId) return;
+      this.apiService.getUserLMSCourses(actualId).subscribe({
+        next: (res: any) => {
+          this.assignedCourses.set(res?.data || []);
+        },
+        error: (err: any) => console.error('Failed to load employee LMS courses', err)
+      });
+
+      this.apiService.getLMSCourses().subscribe({
+        next: (res: any) => {
+          this.availableCourses.set(res?.data || []);
+        },
+        error: (err: any) => console.error('Failed to load LMS courses catalog', err)
+      });
+    }
+
+  openAssignCourseModal() {
+      this.selectedCourseIdToAssign.set('');
+      this.showAssignCourseModal.set(true);
+    }
+
+  closeAssignCourseModal() {
+      this.showAssignCourseModal.set(false);
+    }
+
+  assignCourseToEmployee() {
+      const courseId = this.selectedCourseIdToAssign();
+      if(!courseId) return;
+
+      const actualId = this.employee()?._id || this.employeeId();
+      this.isAssigningCourse.set(true);
+      this.apiService.assignLMSCourse({
+        courseId,
+        userId: actualId,
+        userType: 'employee',
+        userEmail: this.employee()?.email || '',
+        userName: this.employee()?.fullName || '',
+      }).subscribe({
+        next: () => {
+          this.isAssigningCourse.set(false);
+          this.showAssignCourseModal.set(false);
+          this.alertService.success('Course mapped to employee successfully.');
+          this.loadLMSCourses();
+        },
+        error: (err: any) => {
+          this.isAssigningCourse.set(false);
+          this.alertService.error(err?.error?.message || 'Failed to map course.');
+        }
+      });
+    }
 
   fetchDetails() {
-    this.isLoading.set(true);
-    this.apiService.getEmployeeById(this.employeeId()).subscribe({
-      next: (data) => {
-        console.log('Employee details received:', data);
-        this.employee.set(data);
-        this.isLoading.set(false);
-      },
-      error: (err: any) => {
-        console.error('Failed to fetch employee details', err);
-        this.isLoading.set(false);
-      }
-    });
-  }
+      this.isLoading.set(true);
+      this.apiService.getEmployeeById(this.employeeId()).subscribe({
+        next: (data) => {
+          console.log('Employee details received:', data);
+          this.employee.set(data);
+          this.isLoading.set(false);
+          this.loadLMSCourses();
+        },
+        error: (err: any) => {
+          console.error('Failed to fetch employee details', err);
+          this.isLoading.set(false);
+        }
+      });
+    }
 
   getStatusColor(status: string): string {
-    switch(status?.toLowerCase()) {
+      switch(status?.toLowerCase()) {
       case 'active': return 'status-green';
       case 'on leave': return 'status-orange';
       case 'terminated': return 'status-red';
       default: return 'status-gray';
-    }
+      }
   }
 
-  canPromoteToManager(): boolean {
-    const role = this.userRole()?.toLowerCase();
-    const isManager = this.employee()?.isManager;
-    const isHr = this.employee()?.isHr;
-    // HR and HR_ADMIN can promote to Manager, but they cannot already be Manager or HR
-    return (role === 'hr' || role === 'hr_admin') && !isManager && !isHr;
+  hasFormOneInfo(): boolean {
+    const e = this.employee();
+    if (!e) return false;
+    return Boolean(
+      (e.currentCtc !== undefined && e.currentCtc !== null && e.currentCtc !== '' && e.currentCtc !== 0) ||
+      (e.expectedCtc !== undefined && e.expectedCtc !== null && e.expectedCtc !== '' && e.expectedCtc !== 0) ||
+      (e.noticePeriod !== undefined && e.noticePeriod !== null && e.noticePeriod !== '') ||
+      e.previousOrg || e.experienceYears || e.isExperienced ||
+      e.degree || e.location || (e.projectLinks && e.projectLinks.length > 0) ||
+      (e.assessmentAnswers && Object.keys(e.assessmentAnswers).length > 0) ||
+      e.shortlist?.interviewEvaluation
+    );
   }
 
-  canConvertToHr(): boolean {
-    const role = this.userRole()?.toLowerCase();
-    const isHr = this.employee()?.isHr;
-    const isManager = this.employee()?.isManager;
-    // Only HR_ADMIN can convert others to HR, and they must not already be HR or Manager
-    // (If they are Manager, they use a different conversion path or this one unsets Manager)
-    return role === 'hr_admin' && !isHr && !isManager;
+  getAssessmentEntries(): { label: string; value: string; isLinks: boolean; links: string[] }[] {
+    const answers = this.employee()?.assessmentAnswers;
+    if (!answers || typeof answers !== 'object') return [];
+
+    return Object.entries(answers)
+      .filter(([_, val]) => val !== undefined && val !== null && val !== '')
+      .map(([key, value]) => {
+        const label = key
+          .replace(/([A-Z])/g, ' $1')
+          .replace(/^./, str => str.toUpperCase())
+          .trim();
+
+        let rawItems: string[] = [];
+        if (Array.isArray(value)) {
+          rawItems = value.map(v => String(v).trim()).filter(Boolean);
+        } else if (typeof value === 'string' && (value.includes('http://') || value.includes('https://') || value.includes('drive.google.com') || value.includes('github.com') || value.includes('www.'))) {
+          rawItems = value.split(',').map(s => s.trim()).filter(Boolean);
+        }
+
+        const isLinks = rawItems.length > 0 && rawItems.every(item => 
+          item.startsWith('http://') || item.startsWith('https://') || item.startsWith('www.') || item.includes('drive.google.com') || item.includes('github.com')
+        );
+
+        const displayValue = Array.isArray(value) ? value.join(', ') : (typeof value === 'object' ? JSON.stringify(value) : String(value));
+        return { label, value: displayValue, isLinks, links: isLinks ? rawItems : [] };
+      });
   }
 
-  canDemoteToManager(): boolean {
-    const role = this.userRole()?.toLowerCase();
-    const isHr = this.employee()?.isHr;
-    // Only HR_ADMIN can demote HR back to Manager
-    return role === 'hr_admin' && isHr === true;
-  }
+canPromoteToManager(): boolean {
+  const role = this.userRole()?.toLowerCase();
+  const isManager = this.employee()?.isManager;
+  const isHr = this.employee()?.isHr;
+  // HR and HR_ADMIN can promote to Manager, but they cannot already be Manager or HR
+  return (role === 'hr' || role === 'hr_admin') && !isManager && !isHr;
+}
 
-  canDemoteToEmployee(): boolean {
-    const role = this.userRole()?.toLowerCase();
-    const isManager = this.employee()?.isManager;
-    const isHr = this.employee()?.isHr;
-    // HR and HR_ADMIN can demote Manager to Employee (if they are not also HR)
-    return (role === 'hr' || role === 'hr_admin') && isManager === true && !isHr;
-  }
+canConvertToHr(): boolean {
+  const role = this.userRole()?.toLowerCase();
+  const isHr = this.employee()?.isHr;
+  const isManager = this.employee()?.isManager;
+  // Only HR_ADMIN can convert others to HR, and they must not already be HR or Manager
+  // (If they are Manager, they use a different conversion path or this one unsets Manager)
+  return role === 'hr_admin' && !isHr && !isManager;
+}
+
+canDemoteToManager(): boolean {
+  const role = this.userRole()?.toLowerCase();
+  const isHr = this.employee()?.isHr;
+  // Only HR_ADMIN can demote HR back to Manager
+  return role === 'hr_admin' && isHr === true;
+}
+
+canDemoteToEmployee(): boolean {
+  const role = this.userRole()?.toLowerCase();
+  const isManager = this.employee()?.isManager;
+  const isHr = this.employee()?.isHr;
+  // HR and HR_ADMIN can demote Manager to Employee (if they are not also HR)
+  return (role === 'hr' || role === 'hr_admin') && isManager === true && !isHr;
+}
 
   async promoteToManager() {
-    if (!await this.alertService.confirm('Promote this employee to Manager?')) return;
-    this.isPromoting.set(true);
-    this.apiService.promoteToManager(this.employeeId()).subscribe({
-      next: () => {
-        this.alertService.show('Employee promoted to Manager successfully!');
-        this.fetchDetails();
-        this.isPromoting.set(false);
-      },
-      error: (err: any) => {
-        this.alertService.show('Promotion failed: ' + (err.error?.message || err.message));
-        this.isPromoting.set(false);
-      }
-    });
-  }
+  if (!await this.alertService.confirm('Promote this employee to Manager?')) return;
+  this.isPromoting.set(true);
+  this.apiService.promoteToManager(this.employeeId()).subscribe({
+    next: () => {
+      this.alertService.show('Employee promoted to Manager successfully!');
+      this.fetchDetails();
+      this.isPromoting.set(false);
+    },
+    error: (err: any) => {
+      this.alertService.show('Promotion failed: ' + (err.error?.message || err.message));
+      this.isPromoting.set(false);
+    }
+  });
+}
 
   async convertToHr() {
-    if (!await this.alertService.confirm('Convert this staff member to HR? They will gain admin dashboard access.')) return;
-    this.isPromoting.set(true);
-    this.apiService.convertToHr(this.employeeId()).subscribe({
-      next: () => {
-        this.alertService.show('Staff converted to HR successfully!');
-        this.fetchDetails();
-        this.isPromoting.set(false);
-      },
-      error: (err: any) => {
-        this.alertService.show('Conversion failed: ' + (err.error?.message || err.message));
-        this.isPromoting.set(false);
-      }
-    });
-  }
+  if (!await this.alertService.confirm('Convert this staff member to HR? They will gain admin dashboard access.')) return;
+  this.isPromoting.set(true);
+  this.apiService.convertToHr(this.employeeId()).subscribe({
+    next: () => {
+      this.alertService.show('Staff converted to HR successfully!');
+      this.fetchDetails();
+      this.isPromoting.set(false);
+    },
+    error: (err: any) => {
+      this.alertService.show('Conversion failed: ' + (err.error?.message || err.message));
+      this.isPromoting.set(false);
+    }
+  });
+}
 
   async demoteToManager() {
-    if (!await this.alertService.confirm('Demote this HR staff member back to Manager? Their admin privileges will be revoked.')) return;
-    this.isPromoting.set(true);
-    this.apiService.demoteToManager(this.employeeId()).subscribe({
-      next: () => {
-        this.alertService.show('HR staff demoted to Manager successfully!');
-        this.fetchDetails();
-        this.isPromoting.set(false);
-      },
-      error: (err: any) => {
-        this.alertService.show('Demotion failed: ' + (err.error?.message || err.message));
-        this.isPromoting.set(false);
-      }
-    });
-  }
+  if (!await this.alertService.confirm('Demote this HR staff member back to Manager? Their admin privileges will be revoked.')) return;
+  this.isPromoting.set(true);
+  this.apiService.demoteToManager(this.employeeId()).subscribe({
+    next: () => {
+      this.alertService.show('HR staff demoted to Manager successfully!');
+      this.fetchDetails();
+      this.isPromoting.set(false);
+    },
+    error: (err: any) => {
+      this.alertService.show('Demotion failed: ' + (err.error?.message || err.message));
+      this.isPromoting.set(false);
+    }
+  });
+}
 
   async demoteToEmployee() {
-    if (!await this.alertService.confirm('Demote this Manager back to Employee status?')) return;
-    this.isPromoting.set(true);
-    this.apiService.demoteManagerToEmployee(this.employeeId()).subscribe({
-      next: () => {
-        this.alertService.show('Manager demoted to Employee successfully!');
-        this.fetchDetails();
-        this.isPromoting.set(false);
-      },
-      error: (err: any) => {
-        this.alertService.show('Demotion failed: ' + (err.error?.message || err.message));
-        this.isPromoting.set(false);
-      }
-    });
-  }
-
-  editProfile() {
-    this.router.navigate(['/employees/add', this.employeeId()], { queryParams: { edit: 'true' } });
-  }
-
-  canTerminate(): boolean {
-    const role = this.userRole()?.toLowerCase();
-    const isHr = this.employee()?.isHr;
-    if (isHr) {
-      return role === 'hr_admin';
+  if (!await this.alertService.confirm('Demote this Manager back to Employee status?')) return;
+  this.isPromoting.set(true);
+  this.apiService.demoteManagerToEmployee(this.employeeId()).subscribe({
+    next: () => {
+      this.alertService.show('Manager demoted to Employee successfully!');
+      this.fetchDetails();
+      this.isPromoting.set(false);
+    },
+    error: (err: any) => {
+      this.alertService.show('Demotion failed: ' + (err.error?.message || err.message));
+      this.isPromoting.set(false);
     }
-    return role === 'hr' || role === 'hr_admin';
-  }
+  });
+}
 
-  toggleTerminateForm() {
-    this.showTerminateForm.set(!this.showTerminateForm());
-    if (!this.showTerminateForm()) {
-      this.terminationReason.set('');
+editProfile() {
+  this.router.navigate(['/employees/add', this.employeeId()], { queryParams: { edit: 'true' } });
+}
+
+canTerminate(): boolean {
+  const role = this.userRole()?.toLowerCase();
+  const isHr = this.employee()?.isHr;
+  if (isHr) {
+    return role === 'hr_admin';
+  }
+  return role === 'hr' || role === 'hr_admin';
+}
+
+toggleTerminateForm() {
+  this.showTerminateForm.set(!this.showTerminateForm());
+  if (!this.showTerminateForm()) {
+    this.terminationReason.set('');
+  }
+}
+
+toggleRemoteAccess() {
+  const isNowRemote = !this.employee().isRemote;
+  this.apiService.updateEmployee(this.employeeId(), { isRemote: isNowRemote }).subscribe({
+    next: () => {
+      this.alertService.show(`Remote access ${isNowRemote ? 'enabled' : 'disabled'}`);
+      this.fetchDetails();
+    },
+    error: (err: any) => {
+      console.error('Failed to update remote status', err);
+      const errMsg = err?.error?.message || err?.message || 'Unknown error';
+      this.alertService.show(`Failed to update remote status: ${errMsg}`);
     }
-  }
-
-  toggleRemoteAccess() {
-    const isNowRemote = !this.employee().isRemote;
-    this.apiService.updateEmployee(this.employeeId(), { isRemote: isNowRemote }).subscribe({
-      next: () => {
-        this.alertService.show(`Remote access ${isNowRemote ? 'enabled' : 'disabled'}`);
-        this.fetchDetails();
-      },
-      error: (err: any) => {
-        console.error('Failed to update remote status', err);
-        const errMsg = err?.error?.message || err?.message || 'Unknown error';
-        this.alertService.show(`Failed to update remote status: ${errMsg}`);
-      }
-    });
-  }
+  });
+}
 
   async terminateEmployee() {
-    if (!this.terminationReason().trim()) {
-      this.alertService.show("Please provide a reason for termination.");
-      return;
-    }
-    
-    if (!await this.alertService.confirm('Are you sure you want to terminate this staff member? This action will disable their login access.')) return;
-
-    this.isTerminating.set(true);
-    this.apiService.terminateStaff(this.employeeId(), 'employee', this.terminationReason()).subscribe({
-      next: () => {
-        this.alertService.show('Staff member terminated successfully!');
-        this.fetchDetails();
-        this.isTerminating.set(false);
-        this.showTerminateForm.set(false);
-      },
-      error: (err: any) => {
-        this.alertService.show('Termination failed: ' + (err.error?.message || err.message));
-        this.isTerminating.set(false);
-      }
-    });
+  if (!this.terminationReason().trim()) {
+    this.alertService.show("Please provide a reason for termination.");
+    return;
   }
+
+  if (!await this.alertService.confirm('Are you sure you want to terminate this staff member? This action will disable their login access.')) return;
+
+  this.isTerminating.set(true);
+  this.apiService.terminateStaff(this.employeeId(), 'employee', this.terminationReason()).subscribe({
+    next: () => {
+      this.alertService.show('Staff member terminated successfully!');
+      this.fetchDetails();
+      this.isTerminating.set(false);
+      this.showTerminateForm.set(false);
+    },
+    error: (err: any) => {
+      this.alertService.show('Termination failed: ' + (err.error?.message || err.message));
+      this.isTerminating.set(false);
+    }
+  });
+}
 }

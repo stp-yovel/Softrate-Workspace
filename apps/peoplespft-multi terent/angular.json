@@ -29,6 +29,7 @@
           },
           "configurations": {
             "production": {
+              "baseHref": "/hrms/",
               "budgets": [
                 {
                   "type": "initial",
@@ -41,6 +42,11 @@
                   "maximumError": "200kB"
                 }
               ],
+              "optimization": {
+                "scripts": true,
+                "styles": true,
+                "fonts": false
+              },
               "outputHashing": "all"
             },
             "development": {

@@ -10,7 +10,7 @@ if (!fs.existsSync(uploadsDir)) {
 
 exports.createWalkinDrive = async (req, res) => {
   try {
-    const { startDate, startTime, endDate, endTime, whatsappGroupLink } = req.body;
+    const { startDate, startTime, endDate, endTime, whatsappGroupLink, driveType, title } = req.body;
     let jdPdfUrl = '';
 
     if (req.file) {
@@ -19,7 +19,7 @@ exports.createWalkinDrive = async (req, res) => {
       const filePath = path.join(uploadsDir, fileName);
       fs.writeFileSync(filePath, req.file.buffer);
       jdPdfUrl = `/uploads/${fileName}`;
-    } else {
+    } else if (!driveType || driveType === 'walkin') {
       return res.status(400).json({ message: 'JD PDF is required.' });
     }
 
@@ -27,20 +27,22 @@ exports.createWalkinDrive = async (req, res) => {
     const WalkinDriveModel = req.models && req.models.WalkinDrive ? req.models.WalkinDrive : WalkinDrive;
 
     const newDrive = new WalkinDriveModel({
+      driveType: driveType || 'walkin',
+      title: (title || '').trim(),
       startDate: new Date(startDate),
       startTime,
       endDate: new Date(endDate),
       endTime,
       jdPdfUrl,
-      whatsappGroupLink,
+      whatsappGroupLink: whatsappGroupLink || '',
       companyId: req.tenant ? req.tenant.companyId : null,
       createdBy: req.user ? req.user._id : null
     });
 
     await newDrive.save();
-    res.status(201).json({ message: 'Walkin Drive created successfully', drive: newDrive });
+    res.status(201).json({ message: 'Drive created successfully', drive: newDrive });
   } catch (error) {
-    console.error('Error creating walkin drive:', error);
+    console.error('Error creating drive:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

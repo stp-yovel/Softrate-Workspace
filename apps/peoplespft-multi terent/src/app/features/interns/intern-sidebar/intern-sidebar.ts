@@ -2,7 +2,7 @@ import { Component, Input, inject } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { HugeiconsIconComponent } from '@hugeicons/angular';
-import { Home01Icon, FileDownloadIcon, NoteEditIcon, Calendar01Icon, Chat01Icon, LogoutIcon, CancelCircleIcon } from '@hugeicons/core-free-icons';
+import { Home01Icon, FileDownloadIcon, NoteEditIcon, Calendar01Icon, Chat01Icon, LogoutIcon, CancelCircleIcon, Video01Icon } from '@hugeicons/core-free-icons';
 import { ApiService } from '../../../services/api.service';
 
 @Component({
@@ -37,6 +37,16 @@ import { ApiService } from '../../../services/api.service';
         <hugeicons-icon [icon]="Chat01Icon" size="20" [strokeWidth]="1.5" color="#f97316"></hugeicons-icon>
       </div>
       <span class="action-label">Pending Requests</span>
+    </button>
+
+    <div class="sidebar-divider"></div>
+
+    <!-- SHORTLISTED CANDIDATES -->
+    <button routerLink="/shortlisting" class="sidebar-action-item" [class.active]="activeTab === 'shortlist'" title="Shortlisted Candidates">
+      <div class="action-icon-circle">
+        <hugeicons-icon [icon]="Video01Icon" size="20" [strokeWidth]="1.5" color="#6366f1"></hugeicons-icon>
+      </div>
+      <span class="action-label">Shortlisted</span>
     </button>
 
     <div class="sidebar-divider"></div>
@@ -91,6 +101,7 @@ export class InternSidebar {
   readonly NoteEditIcon = NoteEditIcon;
   readonly Calendar01Icon = Calendar01Icon;
   readonly Chat01Icon = Chat01Icon;
+  readonly Video01Icon = Video01Icon;
   readonly LogoutIcon = LogoutIcon;
   readonly CancelCircleIcon = CancelCircleIcon;
 

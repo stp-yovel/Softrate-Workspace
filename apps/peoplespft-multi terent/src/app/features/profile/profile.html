@@ -94,7 +94,7 @@
           <div class="info-item">
             <span class="info-label">Date of Birth</span>
             <span class="info-value" *ngIf="!isEditing()">{{ displayDob() }}</span>
-            <input *ngIf="isEditing()" type="date" [(ngModel)]="editData.dob" class="edit-input">
+            <input *ngIf="isEditing()" type="date" [(ngModel)]="editData.dob" [min]="minDobDate" [max]="maxDobDate" class="edit-input">
           </div>
           <div class="info-item">
             <span class="info-label">Age</span>
@@ -134,18 +134,7 @@
             <textarea *ngIf="isEditing()" [(ngModel)]="editData.address" class="edit-input edit-textarea" rows="2"
               placeholder="Enter full address..."></textarea>
           </div>
-          <div class="info-item">
-            <span class="info-label">Emergency Contact Name</span>
-            <span class="info-value" *ngIf="!isEditing()">{{ displayEmergencyName() }}</span>
-            <input *ngIf="isEditing()" type="text" [(ngModel)]="editData.emergencyName" class="edit-input"
-              placeholder="e.g. John Doe">
-          </div>
-          <div class="info-item">
-            <span class="info-label">Emergency Phone</span>
-            <span class="info-value" *ngIf="!isEditing()">{{ displayEmergencyPhone() }}</span>
-            <input *ngIf="isEditing()" type="tel" [(ngModel)]="editData.emergencyPhone" class="edit-input"
-              placeholder="e.g. +1 234 567 8900">
-          </div>
+
           <div class="info-item" style="grid-column: 1 / -1;">
             <span class="info-label">Area of Expectation</span>
             <div class="tags-container" *ngIf="!isEditing()">
@@ -173,6 +162,75 @@
             <span class="info-value" *ngIf="!isEditing()" style="white-space: pre-wrap;">{{ displayAboutMe() }}</span>
             <textarea *ngIf="isEditing()" [(ngModel)]="editData.aboutMe" class="edit-input edit-textarea" rows="4"
               placeholder="Tell us about yourself..."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bank & Statutory Details Card (for Employees) -->
+      <div class="info-card" style="margin-top: 24px;" *ngIf="displayRole() !== 'Intern' && role() !== 'intern'">
+        <div class="section-header"
+          style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; padding-bottom: 16px; border-bottom: 1px solid #f0f0f0;">
+          <div>
+            <h3 style="margin-bottom: 4px; padding-bottom: 0; border-bottom: none;">Bank & Statutory Details</h3>
+            <p style="margin: 0; font-size: 13px; color: #64748b;">Used for salary disbursement and monthly payslip generation</p>
+          </div>
+          <!-- Edit Actions synced with top edit -->
+          <div style="display: flex; gap: 8px;">
+            <button class="edit-btn" style="padding: 6px 12px; font-size: 13px;" *ngIf="!isEditing()"
+              (click)="toggleEdit()">
+              <i class="fa-solid fa-pen" style="margin-right: 4px;"></i> Edit Details
+            </button>
+          </div>
+        </div>
+
+        <div class="info-grid">
+          <div class="info-item">
+            <span class="info-label">PAN Number</span>
+            <span class="info-value" *ngIf="!isEditing()" style="font-family: monospace; font-weight: 600; letter-spacing: 0.5px;">{{ displayPan() }}</span>
+            <input *ngIf="isEditing()" type="text" [(ngModel)]="editData.panNumber" class="edit-input"
+              placeholder="e.g. ABCDE1234F" maxlength="10" style="text-transform: uppercase;">
+          </div>
+          <div class="info-item">
+            <span class="info-label">UAN Number (EPFO)</span>
+            <span class="info-value" *ngIf="!isEditing()" style="font-family: monospace; font-weight: 600; letter-spacing: 0.5px;">{{ displayUan() }}</span>
+            <input *ngIf="isEditing()" type="text" [(ngModel)]="editData.uanNumber" class="edit-input"
+              placeholder="e.g. 101234567890" maxlength="12">
+          </div>
+          <div class="info-item">
+            <span class="info-label">ESI Number</span>
+            <span class="info-value" *ngIf="!isEditing()" style="font-family: monospace; font-weight: 600; letter-spacing: 0.5px;">{{ displayEsi() }}</span>
+            <input *ngIf="isEditing()" type="text" [(ngModel)]="editData.esiNumber" class="edit-input"
+              placeholder="e.g. 31001234560000001" maxlength="17">
+          </div>
+          <div class="info-item">
+            <span class="info-label">Account Holder Name</span>
+            <span class="info-value" *ngIf="!isEditing()">{{ displayAccountHolderName() }}</span>
+            <input *ngIf="isEditing()" type="text" [(ngModel)]="editData.bankDetails.accountHolderName" class="edit-input"
+              placeholder="e.g. Sam Kumar">
+          </div>
+          <div class="info-item">
+            <span class="info-label">Bank Name</span>
+            <span class="info-value" *ngIf="!isEditing()">{{ displayBankName() }}</span>
+            <input *ngIf="isEditing()" type="text" [(ngModel)]="editData.bankDetails.bankName" class="edit-input"
+              placeholder="e.g. HDFC Bank">
+          </div>
+          <div class="info-item">
+            <span class="info-label">Account Number</span>
+            <span class="info-value" *ngIf="!isEditing()" style="font-family: monospace; font-weight: 600; letter-spacing: 0.5px;">{{ displayAccountNumber() }}</span>
+            <input *ngIf="isEditing()" type="text" [(ngModel)]="editData.bankDetails.accountNumber" class="edit-input"
+              placeholder="e.g. 50100234567890">
+          </div>
+          <div class="info-item">
+            <span class="info-label">IFSC Code</span>
+            <span class="info-value" *ngIf="!isEditing()" style="font-family: monospace; font-weight: 600; letter-spacing: 0.5px;">{{ displayIfscCode() }}</span>
+            <input *ngIf="isEditing()" type="text" [(ngModel)]="editData.bankDetails.ifscCode" class="edit-input"
+              placeholder="e.g. HDFC0001234" maxlength="11" style="text-transform: uppercase;">
+          </div>
+          <div class="info-item">
+            <span class="info-label">Branch Name</span>
+            <span class="info-value" *ngIf="!isEditing()">{{ displayBranchName() }}</span>
+            <input *ngIf="isEditing()" type="text" [(ngModel)]="editData.bankDetails.branchName" class="edit-input"
+              placeholder="e.g. Chennai Main Branch">
           </div>
         </div>
       </div>

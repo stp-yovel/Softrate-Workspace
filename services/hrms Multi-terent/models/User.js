@@ -76,8 +76,22 @@ const UserSchema = new mongoose.Schema({
     whatsappConsent: { type: Boolean, default: false },
   },
 
+  // Assessment Answers (Role Specific)
+  assessmentAnswers: { type: mongoose.Schema.Types.Mixed, default: {} },
+
   createdAt: { type: Date, default: Date.now },
   updatedAt: { type: Date, default: Date.now },
+  // Statutory & Bank Details
+  panNumber: { type: String, default: "" },
+  uanNumber: { type: String, default: "" },
+  esiNumber: { type: String, default: "" },
+  bankDetails: {
+    bankName: { type: String, default: "" },
+    accountNumber: { type: String, default: "" },
+    ifscCode: { type: String, default: "" },
+    branchName: { type: String, default: "" },
+    accountHolderName: { type: String, default: "" }
+  },
   payroll: {
     basicSalary: { type: Number, default: 0 },
     hra: { type: Number, default: 0 },

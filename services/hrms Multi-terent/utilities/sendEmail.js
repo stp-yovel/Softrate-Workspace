@@ -1,9 +1,8 @@
 const { Resend } = require("resend");
 
-// Logo hosted as a static asset — served via express.static('public')
+// Logo hosted as a static asset or public CDN
 const getLogoUrl = () => {
-  const baseUrl = process.env.BACKEND_URL || "http://localhost:5001";
-  return `${baseUrl.replace(/\/$/, '')}/assets/images/softrate-logo.jpg`;
+  return process.env.COMPANY_LOGO_URL || "https://www.softrateglobal.com/assets/img/logo/softrate-transparent-logo.png";
 };
 
 const sendEmail = async ({ to, subject, html, text, attachments = [], replyTo }) => {
@@ -39,20 +38,23 @@ const sendEmail = async ({ to, subject, html, text, attachments = [], replyTo })
     if (text) {
       emailConfig.text = text;
     } else if (html) {
-      emailConfig.text = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+      emailConfig.text = html
+        .replace(/<[^>]*>/g, " ")
+        .replace(/\s+/g, " ")
+        .trim();
     }
 
     if (attachments.length > 0) {
-      emailConfig.attachments = attachments.map(a => ({
+      emailConfig.attachments = attachments.map((a) => ({
         filename: a.filename,
-        content: a.content.toString('base64'),
-        contentType: a.contentType || 'application/pdf'
+        content: a.content.toString("base64"),
+        contentType: a.contentType || "application/pdf",
       }));
     }
 
     console.log("Sending email with config (attachments converted to base64):", {
       ...emailConfig,
-      attachments: emailConfig.attachments ? emailConfig.attachments.map(a => ({ filename: a.filename, base64Length: a.content.length })) : []
+      attachments: emailConfig.attachments ? emailConfig.attachments.map((a) => ({ filename: a.filename, base64Length: a.content.length })) : [],
     });
 
     const { data, error } = await resend.emails.send(emailConfig);
@@ -69,4 +71,6 @@ const sendEmail = async ({ to, subject, html, text, attachments = [], replyTo })
   }
 };
 
-module.exports = { sendEmail, getLogoUrl };
+module.exports = sendEmail;
+module.exports.sendEmail = sendEmail;
+module.exports.getLogoUrl = getLogoUrl;

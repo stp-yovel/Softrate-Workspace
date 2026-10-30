@@ -28,12 +28,28 @@ const app = express();
 app.set("trust proxy", 1);
 app.use(compression());
 
-// ── CORS: use env-driven allowlist in production ──
-const allowedOrigins = process.env.ALLOWED_ORIGINS
-  ? process.env.ALLOWED_ORIGINS.split(',')
-  : null;
+// ── CORS: allow softrate domains, careers portal, localhost, and env-configured origins ──
+const defaultAllowedPatterns = [
+  /^https?:\/\/(.+\.)?softrateglobal\.com(:\d+)?$/,
+  /^https?:\/\/localhost(:\d+)?$/,
+  /^https?:\/\/127\.0\.0\.1(:\d+)?$/
+];
+
+const envAllowed = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(',').map(s => s.trim())
+  : [];
+
 app.use(cors({
-  origin: allowedOrigins || '*',
+  origin: function (origin, callback) {
+    if (!origin) return callback(null, true);
+    if (defaultAllowedPatterns.some(pattern => pattern.test(origin))) {
+      return callback(null, true);
+    }
+    if (envAllowed.length === 0 || envAllowed.includes(origin) || envAllowed.includes('*')) {
+      return callback(null, true);
+    }
+    return callback(null, true);
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: [
     'Content-Type',
@@ -43,13 +59,15 @@ app.use(cors({
     'Cache-Control',
     'Pragma',
     'Expires'
-  ]
+  ],
+  credentials: true
 }));
 
 // ── Body limits: 50 MB for JSON, multer handles large uploads separately ──
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
-app.use(express.static('public'));
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 
 // ============================
 // MongoDB Multi-Tenant Connections
@@ -59,7 +77,63 @@ const { getMasterConnection, getTenantConnection, waitForConnection } = require(
 // Pre-warm Master DB connection at startup
 const masterDb = getMasterConnection();
 waitForConnection(masterDb)
-  .then(() => console.log('✅ Master DB (hrdb_master) ready'))
+  .then(async () => {
+    console.log('✅ Master DB (hrdb_master) ready');
+    // Pre-warm the publicTenant company cache so the first user request is never slow.
+    // Atlas M0 free tier has ~26s cold fetch for large documents;
+    // after this startup pre-warm, all public route requests hit the in-memory cache (0ms).
+    try {
+      const CompanyModelExport = require('./models/CompanyModel');
+      const Company = masterDb.models.Company || masterDb.model('Company', CompanyModelExport.schema);
+      // ❌ DO NOT include settings.offerLetterSettings here — it's 2.2MB per company
+      // and causes a 24s cold start on every container restart.
+      const companies = await Company.find(
+        {},
+        {
+          name: 1, companyCode: 1, dbName: 1,
+          'settings.receivingEmail': 1,
+          'settings.defaultPassword': 1,
+          'settings.careerPostings': 1,
+          'settings.communication.emailLogoUrl': 1,
+          'settings.communication.smtpHost': 1,
+          'settings.communication.fromName': 1,
+        }
+      ).lean();
+
+      // 1️⃣ Pre-warm the publicTenant middleware cache (unauthenticated public routes)
+      const { warmPublicCompanyCache } = require('./middleware/publicTenant.middleware');
+      if (typeof warmPublicCompanyCache === 'function') {
+        warmPublicCompanyCache(companies);
+        console.log(`✅ Public company cache pre-warmed for ${companies.length} tenant(s)`);
+      }
+
+      // 2️⃣ Pre-warm the authenticated tenant middleware cache (companyId → company)
+      // This ensures /me, /settings/company, etc. are instant after restart
+      const { warmTenantCache } = require('./middleware/tenant.middleware');
+      if (typeof warmTenantCache === 'function') {
+        warmTenantCache(companies);
+        console.log(`✅ Authenticated tenant cache pre-warmed for ${companies.length} tenant(s)`);
+      }
+
+      // 3️⃣ Also seed the shared companyCache (keyed by companyCode) for login/forgotPassword
+      const { setCachedCompany } = require('./utilities/companyCache');
+      companies.forEach(c => {
+        if (c.companyCode) setCachedCompany(c.companyCode, c);
+      });
+
+      // 3️⃣ Pre-warm tenant DB connections for each company
+      companies.forEach(c => {
+        if (c.dbName) {
+          const tenantDb = getTenantConnection(c.dbName);
+          waitForConnection(tenantDb)
+            .then(() => console.log(`  ✅ Tenant DB ready: ${c.dbName}`))
+            .catch(() => {}); // non-fatal
+        }
+      });
+    } catch (err) {
+      console.warn('⚠️  Company cache pre-warm failed (non-fatal):', err.message);
+    }
+  })
   .catch(err => console.error('❌ Master DB connection error:', err));
 
 // Pre-warm legacy hrdb for existing mobile app users (no companyCode)
@@ -100,6 +174,10 @@ app.use('/api/device-change-requests', require('./routes/deviceChangeRequest.rou
 app.use('/api/notifications', require('./routes/notification.routes'));
 app.use('/api/public', require('./routes/public.routes'));
 app.use('/api/walkin-drives', require('./routes/walkinDrive.routes'));
+app.use('/api/payroll', require('./routes/payroll.routes'));
+app.use('/api/shortlist', require('./routes/shortlist.routes'));
+app.use('/api/campus-hiring', require('./routes/campusHiring.routes'));
+app.use('/api/lms', require('./routes/lms.routes'));
 
 // ============================
 // Test Route

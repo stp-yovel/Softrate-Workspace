@@ -36,6 +36,7 @@ import { PerformanceGoals } from './features/performance-goals/performance-goals
 import { TodayAttendance } from './features/attendance/today-attendance/today-attendance';
 import { NotificationsComponent } from './features/notifications/notifications';
 import { ProfileComponent } from './features/profile/profile';
+import { LMSCourses } from './features/lms-courses/lms-courses';
 
 export const routes: Routes = [
   { path: '', redirectTo: 'login', pathMatch: 'full' },
@@ -43,6 +44,7 @@ export const routes: Routes = [
   { path: 'register', component: Register },
   { path: 'user-register', component: UserRegister },
   { path: 'dashboard', component: Dashboard },
+  { path: 'lms-courses', component: LMSCourses },
   { path: 'notifications', component: NotificationsComponent },
   { path: 'payroll', component: PayrollManagement },
   { path: 'attendance/today', component: TodayAttendance },
@@ -97,6 +99,9 @@ export const routes: Routes = [
   { path: 'profile', component: ProfileComponent },
   { path: 'profile/offboarding', loadComponent: () => import('./features/profile/mobile-offboarding/mobile-offboarding').then(m => m.MobileOffboardingComponent) },
   { path: 'walkin-drives', loadComponent: () => import('./features/walkin-drives/walkin-drives.component').then(m => m.WalkinDrivesComponent) },
+  { path: 'shortlisting', loadComponent: () => import('./features/shortlist/shortlist-management/shortlist-management').then(m => m.ShortlistManagementComponent) },
   { path: 'id-card/:companyId/:id', loadComponent: () => import('./features/id-card/id-card').then(m => m.IdCardComponent) },
   { path: 'interns/attendance/corrections', loadComponent: () => import('./features/interns/attendance-corrections/attendance-corrections').then(m => m.AttendanceCorrections) },
+  { path: 'campus-hiring', loadComponent: () => import('./features/campus-hiring/campus-hiring').then(m => m.CampusHiringComponent) },
+  { path: 'reschedule', loadComponent: () => import('./features/shortlist/candidate-reschedule/candidate-reschedule.component').then(m => m.CandidateRescheduleComponent) },
 ];

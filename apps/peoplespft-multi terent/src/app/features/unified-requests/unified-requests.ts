@@ -90,6 +90,16 @@ export class UnifiedRequests implements OnInit, OnDestroy {
 
   selectedRequestIds = signal<Set<string>>(new Set());
 
+  companySettings = signal<any>(null);
+  showRejectModal = signal(false);
+  isSendingReject = signal(false);
+  rejectCandidate = signal<any | null>(null);
+  rejectForm = {
+    reason: '',
+    emailSubject: '',
+    emailBody: ''
+  };
+
   // Special Offboarding flags for HR approval
   certInternship = signal<boolean>(false);
   certProject = signal<boolean>(false);
@@ -145,6 +155,11 @@ export class UnifiedRequests implements OnInit, OnDestroy {
     if (this.isHr()) {
       this.fetchManagers();
     }
+
+    this.apiService.getCompanySettings().subscribe({
+      next: (res) => this.companySettings.set(res?.settings),
+      error: (err) => console.error('Failed to load company settings', err)
+    });
 
     this.fetchRequests();
 
@@ -678,6 +693,11 @@ export class UnifiedRequests implements OnInit, OnDestroy {
 
   // Action flow trigger
   openReview(request: any, action: 'approve' | 'reject') {
+    if (request.type === 'onboarding' && action === 'reject') {
+      this.openRejectModal(request);
+      return;
+    }
+
     this.selectedRequest.set(request);
     this.reviewAction.set(action);
     this.reviewRemarks.set('');
@@ -725,6 +745,80 @@ export class UnifiedRequests implements OnInit, OnDestroy {
     this.certLor.set(false);
 
     this.showReviewModal.set(true);
+  }
+
+  openRejectModal(req: any) {
+    this.rejectCandidate.set(req);
+    const raw = req.raw || {};
+    const roleName = raw.designation || raw.role || raw.domain || (req.subType === 'Intern' ? 'Intern' : 'Employee');
+    this.rejectForm.emailSubject = `Update regarding your application for ${roleName} at Softrate`;
+    this.rejectForm.reason = '';
+    this.generateRejectEmailBody();
+    this.showRejectModal.set(true);
+  }
+
+  closeRejectModal() {
+    this.showRejectModal.set(false);
+    this.rejectCandidate.set(null);
+  }
+
+  generateRejectEmailBody() {
+    const req = this.rejectCandidate();
+    if (!req) return;
+    const raw = req.raw || {};
+
+    const rawTemplate = this.companySettings()?.communication?.applicationRejectionTemplate || `
+<p>Dear {formattedName},</p>
+<p>Thank you for taking the time to apply for the <b>{role}</b> position with us and for your interest in our company.</p>
+<p>After careful consideration and review of your application, we regret to inform you that we will not be moving forward with your candidacy for this role at this time.</p>
+{reason}
+<p>We truly appreciate the effort you put into your application and wish you the very best in your job search and future professional endeavors.</p>
+<p>Best regards,<br><b>HR Team</b><br>Softrate Technologies</p>
+    `.trim();
+
+    const candName = req.requesterName || raw.fullName || 'Candidate';
+    const roleName = raw.designation || raw.role || raw.domain || (req.subType === 'Intern' ? 'Intern' : 'Employee');
+    const reasonText = this.rejectForm.reason ? `<p>${this.rejectForm.reason}</p>` : '';
+
+    this.rejectForm.emailBody = rawTemplate
+      .replace(/{formattedName}/g, candName)
+      .replace(/{role}/g, roleName)
+      .replace(/{reason}/g, reasonText)
+      .replace(/{signature}/g, '')
+      .replace(/{logo}/g, '');
+  }
+
+  submitRejectModal() {
+    const req = this.rejectCandidate();
+    if (!req || !req._id) return;
+
+    this.isSendingReject.set(true);
+    const isIntern = req.subType === 'Intern';
+    const payload = {
+      reason: this.rejectForm.reason,
+      emailSubject: this.rejectForm.emailSubject,
+      emailBody: this.rejectForm.emailBody
+    };
+
+    const actionObs = isIntern 
+      ? this.apiService.rejectIntern(req._id, payload)
+      : this.apiService.rejectEmployee(req._id, payload);
+
+    actionObs.subscribe({
+      next: (res: any) => {
+        this.isSendingReject.set(false);
+        this.showRejectModal.set(false);
+        this.rejectCandidate.set(null);
+        this.closeModal();
+        this.fetchRequests();
+        this.alertService.show(res?.message || 'Application rejected and notification email sent successfully.');
+      },
+      error: (err: any) => {
+        this.isSendingReject.set(false);
+        console.error('Failed to reject candidate onboarding request', err);
+        this.alertService.show('Failed to reject application: ' + (err.error?.message || err.message));
+      }
+    });
   }
 
   closeModal() {

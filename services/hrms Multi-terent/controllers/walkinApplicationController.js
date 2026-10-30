@@ -26,7 +26,16 @@ exports.applyToWalkinDrive = async (req, res) => {
       linkedin,
       applicationType,
       resume,
-      projectLinks: projectLinksRaw
+      projectLinks: projectLinksRaw,
+      degree,
+      qualification,
+      location,
+      gender,
+      maritalStatus,
+      dob,
+      countryCode,
+      jobId,
+      assessmentAnswers: assessmentAnswersRaw
     } = req.body;
 
     if (!walkinDriveId) {
@@ -36,22 +45,25 @@ exports.applyToWalkinDrive = async (req, res) => {
       return res.status(400).json({ message: 'Full name and email are required.' });
     }
 
-    // 1. Fetch the walkin drive to get JD PDF URL and WhatsApp link
-    const drive = await WalkinDrive.findById(walkinDriveId);
+    // 1. Fetch the drive to get details
+    const WalkinDriveModel = req.models && req.models.WalkinDrive ? req.models.WalkinDrive : WalkinDrive;
+    const drive = await WalkinDriveModel.findById(walkinDriveId);
     if (!drive) {
-      return res.status(404).json({ message: 'Walk-in Drive not found.' });
+      return res.status(404).json({ message: 'Drive not found.' });
     }
+
+    const isSeasonal = drive.driveType === 'seasonal';
 
     // 2. Check for duplicate application
     const InternModel = req.models && req.models.Intern ? req.models.Intern : Intern;
     const existing = await InternModel.findOne({
-      walkinDriveId,
-      email,
-      companyId: req.tenant.companyId,
-      isWalkinDrive: true
+      $or: [
+        { walkinDriveId, email, companyId: req.tenant.companyId },
+        { seasonalDriveId: walkinDriveId, email, companyId: req.tenant.companyId }
+      ]
     });
     if (existing) {
-      return res.status(400).json({ message: 'You have already applied to this Walk-in Drive.' });
+      return res.status(400).json({ message: `You have already applied to this ${isSeasonal ? 'Seasonal Internship' : 'Walk-in Drive'}.` });
     }
 
     // 3. Parse project links
@@ -65,58 +77,128 @@ exports.applyToWalkinDrive = async (req, res) => {
       }
     } catch (_) { projectLinks = []; }
 
+    // Parse assessment answers
+    let assessmentAnswers = {};
+    try {
+      if (assessmentAnswersRaw) {
+        assessmentAnswers = typeof assessmentAnswersRaw === 'string'
+          ? JSON.parse(assessmentAnswersRaw)
+          : assessmentAnswersRaw;
+      }
+    } catch (_) { assessmentAnswers = {}; }
+
     // 4. Save the application
+    const safeYear = (year && year.trim()) ? year.trim() : (req.body.passingYear || req.body.graduationYear || '1st Year');
+    const safeCollege = (college && college.trim()) ? college.trim() : 'Candidate College';
+    const safeDepartment = (department && department.trim()) ? department.trim() : 'General';
+    const safeEmergencyContact = (emergencyContact && emergencyContact.trim()) ? emergencyContact.trim() : (contact || phone || '0000000000');
+    const safeLinkedin = (linkedin && linkedin.trim()) ? linkedin.trim() : 'https://linkedin.com';
+
+    let dobDate = null;
+    if (dob) {
+      if (typeof dob === 'string' && dob.includes('/')) {
+        const parts = dob.trim().split('/');
+        if (parts.length === 3) {
+          const d = parseInt(parts[0], 10);
+          const m = parseInt(parts[1], 10) - 1;
+          const y = parseInt(parts[2], 10);
+          const customDate = new Date(Date.UTC(y, m, d));
+          if (!isNaN(customDate.getTime())) {
+            dobDate = customDate;
+          }
+        }
+      }
+      if (!dobDate) {
+        const parsed = new Date(dob);
+        if (!isNaN(parsed.getTime())) {
+          dobDate = parsed;
+        }
+      }
+    }
+
     const application = new InternModel({
-      walkinDriveId,
-      isWalkinDrive: true,
+      walkinDriveId: isSeasonal ? null : walkinDriveId,
+      isWalkinDrive: !isSeasonal,
+      seasonalDriveId: isSeasonal ? drive._id : null,
+      isSeasonalInternship: isSeasonal,
+      seasonalTitle: isSeasonal ? (drive.title || 'Seasonal Internship') : '',
       companyId: req.tenant.companyId,
       fullName,
       email,
-      college,
-      year,
-      department,
-      role,
-      contact,
-      emergencyContact,
-      linkedin,
-      applicationType: applicationType || 'Walk-in Drive',
+      college: safeCollege,
+      year: safeYear,
+      department: safeDepartment,
+      role: role || 'Intern',
+      contact: contact || phone,
+      emergencyContact: safeEmergencyContact,
+      linkedin: safeLinkedin,
+      applicationType: isSeasonal ? 'Internship' : (applicationType || 'Walk-in Drive'),
+      degree: degree || qualification || '',
+      location: location || '',
+      gender: gender || '',
+      maritalStatus: maritalStatus || 'Single',
+      dob: dobDate,
+      countryCode: countryCode || '+91',
+      jobId: jobId || '',
+      assessmentAnswers,
       // DO NOT SAVE RESUME IN DATABASE
       projectLinks,
       status: 'initial'
     });
     await application.save();
 
-    // 5. Send Resume to HR Email (Same as Intern logic)
-    if (resume) {
-      try {
-        const resumeBuffer = Buffer.from(resume, 'base64');
+    // 5. Send Full Application to HR Email
+    try {
+      if (req.tenant && req.tenant.receivingEmail) {
+        const { formatApplicationEmailHtml } = require('../utilities/applicationEmailTemplate');
+        const emailHtml = formatApplicationEmailHtml({
+          applicationType: isSeasonal ? (drive.title || 'Seasonal Internship') : 'Walk-in Drive',
+          fullName: application.fullName,
+          email: application.email,
+          phone: application.contact,
+          dob: application.dob,
+          gender: application.gender,
+          maritalStatus: application.maritalStatus,
+          location: application.location,
+          degree: application.degree,
+          qualification: application.degree,
+          college: application.college,
+          department: application.department,
+          year: application.year,
+          passingYear: application.year,
+          role: application.role,
+          jobId: application.jobId,
+          linkedin: application.linkedin,
+          projectLinks: application.projectLinks,
+          assessmentAnswers: application.assessmentAnswers
+        });
+
+        const attachments = [];
+        if (resume) {
+          attachments.push({
+            filename: `${fullName.replace(/\s+/g, '_')}_Resume.pdf`,
+            content: Buffer.from(resume, 'base64'),
+            contentType: 'application/pdf'
+          });
+        }
+
         await sendEmail({
           to: req.tenant.receivingEmail,
-          subject: `New Walk-in Application - ${fullName}`,
-          html: `
-            <p>Hi Admin,</p>
-            <p>A new candidate has applied for a Walk-in Drive.</p>
-            <p><b>Candidate Name:</b> ${fullName}</p>
-            <p><b>Email:</b> ${email}</p>
-            <p><b>Role:</b> ${role}</p>
-            <p>Please find their resume attached.</p>
-          `,
-          attachments: [{
-            filename: `${fullName.replace(/\s+/g, '_')}_Resume.pdf`,
-            content: resumeBuffer,
-            contentType: 'application/pdf'
-          }]
+          subject: `New ${isSeasonal ? (drive.title || 'Seasonal Internship') : 'Walk-in'} Application - ${fullName} (${application.role || 'Intern'})`,
+          html: emailHtml,
+          attachments
         });
-      } catch (err) {
-        console.error('[WalkinApply] Failed to send resume to HR:', err);
       }
+    } catch (err) {
+      console.error('[WalkinApply] Failed to send email to HR:', err);
     }
 
-    // Return success with the WhatsApp link and JD PDF link
+    // Return success
     res.status(200).json({
       message: 'Application submitted successfully!',
-      whatsappGroupLink: drive.whatsappGroupLink,
-      jdPdfUrl: drive.jdPdfUrl
+      whatsappGroupLink: drive.whatsappGroupLink || '',
+      jdPdfUrl: drive.jdPdfUrl || '',
+      isSeasonal
     });
 
   } catch (error) {

@@ -180,13 +180,15 @@
 .modal-content {
   background: white;
   border-radius: 12px;
-  width: 500px;
-  max-width: 90vw;
+  width: 580px;
+  max-width: 94vw;
   box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .modal-header {
-  padding: 20px;
+  padding: 20px 24px;
   border-bottom: 1px solid #eee;
   display: flex;
   justify-content: space-between;
@@ -210,19 +212,24 @@
 }
 
 .modal-body {
-  padding: 20px;
+  padding: 24px;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+  box-sizing: border-box;
+  max-height: 80vh;
+  overflow-y: auto;
 }
 
 .form-group {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+  box-sizing: border-box;
 }
-.form-group:nth-child(5),
-.form-group:nth-child(6) {
+
+.form-group.full-width {
   grid-column: 1 / -1;
 }
 
@@ -233,7 +240,10 @@
 }
 
 .form-control {
-  padding: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  min-width: 0;
+  padding: 10px 12px;
   border: 1px solid #cbd5e1;
   border-radius: 8px;
   font-size: 14px;
@@ -247,8 +257,14 @@
   box-shadow: 0 0 0 2px rgba(0,82,204,0.1);
 }
 
+.form-control.file-input {
+  padding: 7px 10px;
+  background-color: #ffffff;
+  cursor: pointer;
+}
+
 .modal-footer {
-  padding: 20px;
+  padding: 16px 24px;
   border-top: 1px solid #eee;
   display: flex;
   justify-content: flex-end;

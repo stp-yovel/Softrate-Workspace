@@ -1,0 +1,225 @@
+<div class="reschedule-page-container">
+  <div class="reschedule-card">
+    
+    <!-- BRAND HEADER -->
+    <div class="card-header">
+      <div class="brand-badge">
+        <span class="brand-initials">{{ candidate()?.companyName ? candidate()?.companyName.substring(0, 2).toUpperCase() : 'PS' }}</span>
+      </div>
+      <div class="brand-text">
+        <h2>{{ candidate()?.companyName || 'Softrate Technologies' }}</h2>
+        <p class="subtitle">Interview Reschedule Portal</p>
+      </div>
+    </div>
+
+    <!-- LOADING STATE -->
+    <div *ngIf="isLoading()" class="state-container loading-state">
+      <div class="spinner"></div>
+      <p>Loading your interview schedule...</p>
+    </div>
+
+    <!-- ERROR STATE (IF NO RECORD / INVALID TOKEN) -->
+    <div *ngIf="!isLoading() && error() && !candidate()" class="state-container error-state">
+      <div class="icon-circle error-circle">
+        <hugeicons-icon [icon]="AlertIcon" size="20" [strokeWidth]="2" color="#dc2626"></hugeicons-icon>
+      </div>
+      <h3>Unable to Access Reschedule</h3>
+      <p class="error-desc">{{ error() }}</p>
+      <a routerLink="/login" class="btn btn-secondary" style="margin-top: 16px;">Return to Sign In</a>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div *ngIf="!isLoading() && candidate()" class="card-content">
+      
+      <!-- SUBMISSION SUCCESS BANNER -->
+      <div *ngIf="submitSuccess()" class="alert-banner success-banner">
+        <hugeicons-icon [icon]="CheckIcon" size="16" [strokeWidth]="2" color="#166534"></hugeicons-icon>
+        <span>{{ submitSuccess() }}</span>
+      </div>
+
+      <!-- INLINE ERROR BANNER -->
+      <div *ngIf="error()" class="alert-banner error-banner">
+        <hugeicons-icon [icon]="AlertIcon" size="16" [strokeWidth]="2" color="#991b1b"></hugeicons-icon>
+        <span>{{ error() }}</span>
+      </div>
+
+      <!-- CANDIDATE SUMMARY CARD -->
+      <div class="candidate-summary">
+        <div class="cand-info">
+          <h3 class="cand-name">{{ candidate()?.fullName }}</h3>
+          <p class="cand-role">{{ candidate()?.role || 'Interview Candidate' }} <span *ngIf="candidate()?.department">• {{ candidate()?.department }}</span></p>
+        </div>
+        <div class="status-pill" [class.scheduled]="candidate()?.status === 'scheduled'">
+          {{ candidate()?.status | uppercase }}
+        </div>
+      </div>
+
+      <!-- CURRENT SCHEDULE DETAILS -->
+      <div class="current-schedule-box">
+        <span class="box-label">Currently Scheduled Session</span>
+        <div class="schedule-details">
+          <div class="sched-item">
+            <div class="sched-icon-box">
+              <hugeicons-icon [icon]="CalendarIcon" size="15" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+            </div>
+            <div class="sched-text">
+              <span class="sched-title">Date</span>
+              <span class="sched-val">{{ candidate()?.meetDate | date:'fullDate' }}</span>
+            </div>
+          </div>
+          <div class="sched-item">
+            <div class="sched-icon-box">
+              <hugeicons-icon [icon]="ClockIcon" size="15" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+            </div>
+            <div class="sched-text">
+              <span class="sched-title">Time</span>
+              <span class="sched-val">{{ candidate()?.meetTime }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATE A: RESCHEDULE REQUEST IS CURRENTLY PENDING -->
+      <div *ngIf="reschedule()?.status === 'pending'" class="pending-notice-card">
+        <div class="notice-header">
+          <span class="notice-badge">
+            <span class="status-dot"></span>
+            Request Under Review
+          </span>
+          <span class="notice-date">Submitted on {{ reschedule()?.requestedAt | date:'mediumDate' }}</span>
+        </div>
+        <div class="proposed-slot-row">
+          <span class="proposed-label">Requested Alternative:</span>
+          <div class="proposed-value">
+            <hugeicons-icon [icon]="CalendarIcon" size="14" [strokeWidth]="1.8" color="#0f172a"></hugeicons-icon>
+            <span>{{ reschedule()?.requestedDate | date:'fullDate' }}</span>
+            <span class="proposed-separator">•</span>
+            <hugeicons-icon [icon]="ClockIcon" size="14" [strokeWidth]="1.8" color="#0f172a"></hugeicons-icon>
+            <span>{{ reschedule()?.requestedTime }}</span>
+          </div>
+        </div>
+        <div *ngIf="reschedule()?.reason" class="reason-note-inline">
+          <span class="reason-note-label">Reason:</span>
+          <span class="reason-note-text">"{{ reschedule()?.reason }}"</span>
+        </div>
+        <p class="notice-footer">
+          The HR team is reviewing your requested slot. An updated email confirmation will be sent as soon as it is processed.
+        </p>
+      </div>
+
+      <!-- STATE B: RESCHEDULE ALREADY ACCEPTED -->
+      <div *ngIf="reschedule()?.status === 'accepted'" class="accepted-notice-card">
+        <div class="notice-header">
+          <span class="notice-badge accepted">
+            <hugeicons-icon [icon]="CheckIcon" size="13" [strokeWidth]="2" color="#166534"></hugeicons-icon>
+            Reschedule Confirmed
+          </span>
+          <span class="notice-date">{{ reschedule()?.respondedAt | date:'mediumDate' }}</span>
+        </div>
+        <div class="proposed-slot-row">
+          <span class="proposed-label">Confirmed Slot:</span>
+          <div class="proposed-value text-success">
+            <hugeicons-icon [icon]="CalendarIcon" size="14" [strokeWidth]="1.8" color="#166534"></hugeicons-icon>
+            <span>{{ candidate()?.meetDate | date:'fullDate' }}</span>
+            <span class="proposed-separator">•</span>
+            <hugeicons-icon [icon]="ClockIcon" size="14" [strokeWidth]="1.8" color="#166534"></hugeicons-icon>
+            <span>{{ candidate()?.meetTime }}</span>
+          </div>
+        </div>
+        <p class="notice-footer">
+          An updated invitation with meeting link and instructions has been sent to your email.
+        </p>
+      </div>
+
+      <!-- STATE C: RESCHEDULE WAS DECLINED -->
+      <div *ngIf="reschedule()?.status === 'declined'" class="declined-notice-card">
+        <div class="notice-header">
+          <span class="notice-badge declined">Schedule Maintained</span>
+        </div>
+        <p class="notice-text">
+          Due to panel availability, your reschedule request could not be accommodated. Your original interview schedule remains active.
+        </p>
+        <div *ngIf="reschedule()?.adminNotes" class="reason-note-inline">
+          <span class="reason-note-label">HR Note:</span>
+          <span class="reason-note-text">{{ reschedule()?.adminNotes }}</span>
+        </div>
+      </div>
+
+      <!-- STATE D: RESCHEDULE FORM (CAN SUBMIT) -->
+      <div *ngIf="reschedule()?.canReschedule" class="form-section">
+        <div class="form-title-group">
+          <h4>Propose an Alternative Slot</h4>
+          <p class="form-subtitle">Choose a convenient date and time during standard business hours (Monday – Saturday).</p>
+        </div>
+
+        <form (ngSubmit)="submitReschedule()" #rescheduleForm="ngForm">
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="preferredDate">Preferred Date *</label>
+              <input 
+                type="date" 
+                id="preferredDate" 
+                name="preferredDate" 
+                [(ngModel)]="preferredDate" 
+                [min]="minDate" 
+                class="form-control"
+                required
+              >
+            </div>
+
+            <div class="form-group">
+              <label for="preferredTime">Preferred Time Slot *</label>
+              <select 
+                id="preferredTime" 
+                name="preferredTime" 
+                [(ngModel)]="preferredTime" 
+                class="form-control"
+                required
+              >
+                <option *ngFor="let slot of timeSlots" [value]="slot">{{ slot }}</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 14px;">
+            <label for="reason">Reason for Rescheduling (Optional)</label>
+            <textarea 
+              id="reason" 
+              name="reason" 
+              [(ngModel)]="reason" 
+              rows="3" 
+              placeholder="e.g. Prior academic exam commitment, travel delay..."
+              class="form-control"
+            ></textarea>
+          </div>
+
+          <!-- POLICY NOTICE -->
+          <div class="policy-notice">
+            <hugeicons-icon [icon]="InfoIcon" size="14" [strokeWidth]="1.8" color="#64748b"></hugeicons-icon>
+            <span>Candidates are allowed <strong>one reschedule request</strong> per interview round. Once submitted, HR will review and confirm availability.</span>
+          </div>
+
+          <div class="form-actions">
+            <button 
+              type="submit" 
+              class="btn btn-primary" 
+              [disabled]="isSubmitting()"
+            >
+              <span *ngIf="!isSubmitting()">Submit Reschedule Request</span>
+              <span *ngIf="isSubmitting()" class="btn-spinner-text">
+                <span class="mini-spinner"></span> Submitting...
+              </span>
+            </button>
+          </div>
+        </form>
+      </div>
+
+    </div>
+
+    <!-- FOOTER -->
+    <div class="card-footer">
+      <span>Powered by Softrate HRMS</span>
+    </div>
+
+  </div>
+</div>

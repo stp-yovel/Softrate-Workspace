@@ -1,0 +1,481 @@
+<div class="page-container">
+  <!-- Page Header -->
+  <header class="page-header">
+    <div class="header-main">
+      <div class="title-with-pill">
+        <h1>LMS Courses & Curriculum</h1>
+        <span class="count-pill">{{ filteredCourses().length }} course{{ filteredCourses().length === 1 ? '' : 's' }}</span>
+      </div>
+      <p>Create training modules, define sequential video unlock rules, and assign courses to employees or interns.</p>
+    </div>
+    <div class="header-actions">
+      <button type="button" class="btn-primary" (click)="openAddCourseModal()">
+        <hugeicons-icon [icon]="PlusSignIcon" size="16" [strokeWidth]="2" color="currentColor"></hugeicons-icon>
+        <span>Add New Course</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- Metrics Summary Strip -->
+  <section class="metrics-strip" aria-label="Course statistics">
+    <div class="metric-chip">
+      <div class="metric-icon-box">
+        <hugeicons-icon [icon]="LicenseDraftIcon" size="18" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+      </div>
+      <div class="metric-details">
+        <span class="metric-label">Total Courses</span>
+        <span class="metric-value">{{ totalCourses() }}</span>
+      </div>
+    </div>
+
+    <div class="metric-chip">
+      <div class="metric-icon-box">
+        <hugeicons-icon [icon]="PlayIcon" size="18" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+      </div>
+      <div class="metric-details">
+        <span class="metric-label">Total Lessons</span>
+        <span class="metric-value">{{ totalLessons() }}</span>
+      </div>
+    </div>
+
+    <div class="metric-chip">
+      <div class="metric-icon-box">
+        <hugeicons-icon [icon]="Clock01Icon" size="18" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+      </div>
+      <div class="metric-details">
+        <span class="metric-label">Progression Rule</span>
+        <span class="metric-value">Sequential (3 Days/Lesson)</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dismissible Alerts -->
+  <div class="alert-banner alert-success" *ngIf="successMsg()" role="status">
+    <div class="alert-content">
+      <hugeicons-icon [icon]="CheckmarkCircle02Icon" size="18" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+      <span>{{ successMsg() }}</span>
+    </div>
+    <button type="button" class="alert-dismiss" (click)="dismissAlerts()" aria-label="Dismiss notification">&times;</button>
+  </div>
+
+  <div class="alert-banner alert-error" *ngIf="errorMsg()" role="alert">
+    <div class="alert-content">
+      <hugeicons-icon [icon]="Cancel01Icon" size="18" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+      <span>{{ errorMsg() }}</span>
+    </div>
+    <button type="button" class="alert-dismiss" (click)="dismissAlerts()" aria-label="Dismiss alert">&times;</button>
+  </div>
+
+  <!-- Filter & Search Toolbar -->
+  <div class="table-toolbar">
+    <div class="search-box">
+      <hugeicons-icon [icon]="Search01Icon" size="16" [strokeWidth]="1.5" color="currentColor" class="search-icon"></hugeicons-icon>
+      <input
+        type="text"
+        [ngModel]="searchQuery()"
+        (ngModelChange)="searchQuery.set($event)"
+        placeholder="Search courses by title, code, or description..."
+        class="search-input"
+        aria-label="Search courses"
+      />
+      <button
+        *ngIf="searchQuery()"
+        type="button"
+        class="btn-clear-search"
+        (click)="searchQuery.set('')"
+        aria-label="Clear search input"
+      >
+        &times;
+      </button>
+    </div>
+
+    <div class="category-filter-group" role="tablist" aria-label="Filter by course category">
+      <button
+        *ngFor="let cat of categories"
+        type="button"
+        class="category-filter-btn"
+        [class.is-active]="selectedCategory() === cat"
+        (click)="setCategory(cat)"
+        role="tab"
+        [attr.aria-selected]="selectedCategory() === cat"
+      >
+        {{ cat }}
+      </button>
+    </div>
+  </div>
+
+  <!-- Table Card -->
+  <div class="table-card">
+    <!-- Skeleton Loading -->
+    <div class="skeleton-table" *ngIf="isLoading()" aria-busy="true" aria-label="Loading courses">
+      <div class="skeleton-row" *ngFor="let i of [1, 2, 3, 4]">
+        <div class="skeleton-avatar"></div>
+        <div class="skeleton-line full"></div>
+        <div class="skeleton-line badge"></div>
+        <div class="skeleton-line pill"></div>
+      </div>
+    </div>
+
+    <!-- Courses Table -->
+    <div class="table-responsive" *ngIf="!isLoading()">
+      <table class="lms-table" *ngIf="filteredCourses().length > 0; else noCourses">
+        <thead>
+          <tr>
+            <th scope="col">Course Details</th>
+            <th scope="col">Category & Code</th>
+            <th scope="col">Curriculum</th>
+            <th scope="col">Progression Rule</th>
+            <th scope="col">Status</th>
+            <th scope="col" class="text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let course of filteredCourses()">
+            <td class="course-info-cell">
+              <div class="course-avatar">
+                <img
+                  *ngIf="getCourseBannerUrl(course); else avatarIcon"
+                  [src]="getCourseBannerUrl(course)"
+                  [alt]="course.title"
+                  class="course-banner-thumb"
+                  loading="lazy"
+                />
+                <ng-template #avatarIcon>
+                  <hugeicons-icon [icon]="LicenseDraftIcon" size="20" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+                </ng-template>
+              </div>
+              <div class="course-details">
+                <span class="course-name">{{ course.title }}</span>
+                <span class="course-snippet">{{ course.description || 'No description provided.' }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="badge-stack">
+                <span class="category-badge">{{ course.category || 'Training' }}</span>
+                <span class="code-badge">{{ course.code }}</span>
+              </div>
+            </td>
+            <td>
+              <div class="meta-tag">
+                <hugeicons-icon [icon]="PlayIcon" size="14" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+                <span>{{ course.videos?.length || 0 }} Lessons</span>
+              </div>
+            </td>
+            <td>
+              <div class="meta-tag rule-tag">
+                <hugeicons-icon [icon]="Clock01Icon" size="14" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+                <span>3 Days / Lesson</span>
+              </div>
+            </td>
+            <td>
+              <span class="status-pill active">{{ course.status || 'Active' }}</span>
+            </td>
+            <td class="text-right">
+              <button
+                type="button"
+                class="btn-assign-row"
+                (click)="openAssignModal(course)"
+                aria-label="Assign course to employee or intern"
+              >
+                <hugeicons-icon [icon]="UserGroupIcon" size="14" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+                <span>Assign</span>
+              </button>
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Empty State -->
+      <ng-template #noCourses>
+        <div class="empty-state">
+          <div class="empty-icon-wrap">
+            <hugeicons-icon [icon]="LicenseDraftIcon" size="32" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+          </div>
+          <h3 class="empty-title">
+            {{ searchQuery() || selectedCategory() !== 'All' ? 'No matching courses found' : 'No LMS courses created yet' }}
+          </h3>
+          <p class="empty-desc">
+            {{ searchQuery() || selectedCategory() !== 'All'
+              ? 'Try adjusting your search query or clear category filters to see all available courses.'
+              : 'Create training modules and add video lessons to train and onboard team members.' }}
+          </p>
+          <div class="empty-actions">
+            <button
+              *ngIf="searchQuery() || selectedCategory() !== 'All'"
+              type="button"
+              class="btn-secondary"
+              (click)="clearFilters()"
+            >
+              Clear Filters
+            </button>
+            <button
+              type="button"
+              class="btn-primary"
+              (click)="openAddCourseModal()"
+            >
+              <hugeicons-icon [icon]="PlusSignIcon" size="14" [strokeWidth]="2" color="currentColor"></hugeicons-icon>
+              <span>Add New Course</span>
+            </button>
+          </div>
+        </div>
+      </ng-template>
+    </div>
+  </div>
+
+  <!-- Add New Course Modal -->
+  <div class="modal-backdrop" *ngIf="showCourseModal()" (keydown.escape)="closeCourseModal()">
+    <div class="modal-card modal-lg" role="dialog" aria-modal="true" aria-labelledby="modalAddCourseTitle">
+      <div class="modal-header">
+        <h2 id="modalAddCourseTitle">Create New LMS Course</h2>
+        <button type="button" class="close-btn" (click)="closeCourseModal()" aria-label="Close modal">
+          <hugeicons-icon [icon]="Cancel01Icon" size="18" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <div class="form-grid">
+          <div class="form-group full-width">
+            <label for="courseTitleInput">Course Title *</label>
+            <input
+              id="courseTitleInput"
+              type="text"
+              [(ngModel)]="newCourse.title"
+              placeholder="e.g. Softrate Engineering Onboarding"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="courseCodeInput">Course Code</label>
+            <input
+              id="courseCodeInput"
+              type="text"
+              [(ngModel)]="newCourse.code"
+              placeholder="e.g. SR-ENG-101"
+            />
+          </div>
+
+          <div class="form-group">
+            <label for="courseCategorySelect">Category</label>
+            <select id="courseCategorySelect" [(ngModel)]="newCourse.category">
+              <option value="Onboarding">Onboarding</option>
+              <option value="Engineering">Engineering</option>
+              <option value="Product">Product</option>
+              <option value="Compliance">Compliance</option>
+            </select>
+          </div>
+
+          <div class="form-group full-width">
+            <label for="courseDescInput">Course Description</label>
+            <textarea
+              id="courseDescInput"
+              [(ngModel)]="newCourse.description"
+              rows="2"
+              placeholder="Brief summary of skills and milestones covered in this curriculum..."
+            ></textarea>
+          </div>
+
+          <div class="form-group full-width">
+            <label>Course Banner Image</label>
+            <input
+              #bannerFileInput
+              type="file"
+              accept="image/*"
+              (change)="onBannerFileSelected($event)"
+              style="display: none"
+            />
+            <button
+              type="button"
+              class="banner-upload-dropzone"
+              (click)="bannerFileInput.click()"
+              aria-label="Upload course banner image"
+            >
+              <div *ngIf="bannerPreview(); else noBanner" class="banner-preview-box">
+                <img [src]="bannerPreview()" alt="Course Banner Preview" class="banner-preview-img" />
+                <span class="btn-change-banner">Change Banner</span>
+              </div>
+              <ng-template #noBanner>
+                <div class="banner-dropzone-content">
+                  <hugeicons-icon [icon]="PlusSignIcon" size="22" [strokeWidth]="2" color="currentColor"></hugeicons-icon>
+                  <p class="dropzone-text"><strong>Click to upload course banner</strong> or drag and drop</p>
+                  <span class="dropzone-hint">16:9 banner image (PNG, JPG, WebP)</span>
+                </div>
+              </ng-template>
+            </button>
+          </div>
+        </div>
+
+        <!-- Video Lessons Section -->
+        <div class="lessons-builder">
+          <div class="lessons-header">
+            <div>
+              <h3>Curriculum Lessons & Timeline Rules</h3>
+              <p class="lessons-header-desc">Videos unlock sequentially as learners finish each milestone.</p>
+            </div>
+            <button type="button" class="btn-secondary-sm" (click)="addVideoRow()">
+              <hugeicons-icon [icon]="PlusSignIcon" size="14" [strokeWidth]="2" color="currentColor"></hugeicons-icon>
+              <span>Add Lesson</span>
+            </button>
+          </div>
+
+          <div class="lesson-row" *ngFor="let vid of newCourse.videos; let i = index">
+            <div class="lesson-index">{{ i + 1 }}</div>
+            <div class="lesson-fields">
+              <input
+                type="text"
+                [(ngModel)]="vid.title"
+                placeholder="Lesson title (e.g. Welcome & Development Environment)"
+                class="input-title"
+                aria-label="Lesson title"
+              />
+              <input
+                type="url"
+                [(ngModel)]="vid.youtubeUrl"
+                placeholder="YouTube video link (https://www.youtube.com/watch?v=...)"
+                class="input-url"
+                aria-label="YouTube video link"
+              />
+
+              <div class="rules-inline">
+                <label>
+                  <span>Completion Deadline:</span>
+                  <input
+                    type="number"
+                    [(ngModel)]="vid.deadlineDays"
+                    min="1"
+                    max="30"
+                    class="input-days"
+                    aria-label="Deadline days"
+                  />
+                  <span>days</span>
+                </label>
+
+                <label class="checkbox-label">
+                  <input
+                    type="checkbox"
+                    [checked]="vid.unlockType === 'sequential'"
+                    (change)="vid.unlockType = $any($event.target).checked ? 'sequential' : 'immediate'"
+                  />
+                  <span>Sequential Unlock</span>
+                </label>
+              </div>
+            </div>
+
+            <button
+              type="button"
+              class="btn-remove"
+              (click)="removeVideoRow(i)"
+              *ngIf="newCourse.videos.length > 1"
+              aria-label="Remove lesson"
+            >
+              &times;
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" (click)="closeCourseModal()" [disabled]="isSaving()">Cancel</button>
+        <button type="button" class="btn-save" (click)="saveCourse()" [disabled]="isSaving()">
+          {{ isSaving() ? 'Saving Course...' : 'Create Course' }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Assign Course Modal -->
+  <div class="modal-backdrop" *ngIf="showAssignModal()" (keydown.escape)="closeAssignModal()">
+    <div class="modal-card" role="dialog" aria-modal="true" aria-labelledby="modalAssignCourseTitle">
+      <div class="modal-header">
+        <h2 id="modalAssignCourseTitle">Assign Course to Learner</h2>
+        <button type="button" class="close-btn" (click)="closeAssignModal()" aria-label="Close modal">
+          <hugeicons-icon [icon]="Cancel01Icon" size="18" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+        </button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Selected Course Summary Card -->
+        <div class="course-summary-card" *ngIf="selectedCourseForAssign()">
+          <div class="summary-avatar">
+            <hugeicons-icon [icon]="LicenseDraftIcon" size="20" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+          </div>
+          <div class="summary-details">
+            <span class="summary-title">{{ selectedCourseForAssign()?.title }}</span>
+            <span class="summary-meta">
+              {{ selectedCourseForAssign()?.code }} &bull; {{ selectedCourseForAssign()?.videos?.length || 0 }} Lessons
+            </span>
+          </div>
+        </div>
+
+        <!-- Learner Role Type Toggle -->
+        <div class="form-group full-width">
+          <label>Select Learner Type</label>
+          <div class="radio-toggle" role="radiogroup">
+            <button
+              type="button"
+              class="radio-option"
+              [class.selected]="assignData.userType === 'employee'"
+              (click)="assignData.userType = 'employee'; onUserTypeChange()"
+              role="radio"
+              [attr.aria-checked]="assignData.userType === 'employee'"
+            >
+              Employee
+            </button>
+            <button
+              type="button"
+              class="radio-option"
+              [class.selected]="assignData.userType === 'intern'"
+              (click)="assignData.userType = 'intern'; onUserTypeChange()"
+              role="radio"
+              [attr.aria-checked]="assignData.userType === 'intern'"
+            >
+              Intern
+            </button>
+          </div>
+        </div>
+
+        <!-- Quick Learner Search Filter -->
+        <div class="form-group full-width" *ngIf="learners().length > 5">
+          <label for="learnerSearchInput">Filter Learners</label>
+          <div class="search-box">
+            <hugeicons-icon [icon]="Search01Icon" size="14" [strokeWidth]="1.5" color="currentColor" class="search-icon"></hugeicons-icon>
+            <input
+              id="learnerSearchInput"
+              type="text"
+              [ngModel]="learnerSearchQuery()"
+              (ngModelChange)="learnerSearchQuery.set($event)"
+              placeholder="Search by name, email, or role..."
+              class="search-input"
+            />
+          </div>
+        </div>
+
+        <!-- Select Learner -->
+        <div class="form-group full-width">
+          <label for="learnerSelect">Choose {{ assignData.userType === 'employee' ? 'Employee' : 'Intern' }} *</label>
+          <select id="learnerSelect" [(ngModel)]="assignData.userId">
+            <option value="" disabled>-- Select a team member --</option>
+            <option *ngFor="let learner of filteredLearners()" [value]="learner._id || learner.id">
+              {{ learner.fullName || learner.name }} ({{ learner.email || 'No email' }})
+              {{ learner.role || learner.designation ? '— ' + (learner.role || learner.designation) : '' }}
+            </option>
+          </select>
+          <span class="field-hint" *ngIf="filteredLearners().length === 0">
+            No matching {{ assignData.userType }}s found.
+          </span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-cancel" (click)="closeAssignModal()" [disabled]="isSaving()">Cancel</button>
+        <button
+          type="button"
+          class="btn-save"
+          (click)="assignCourse()"
+          [disabled]="isSaving() || !assignData.userId"
+        >
+          {{ isSaving() ? 'Assigning...' : 'Assign Course' }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -61,18 +61,67 @@ export class AppSettings implements OnInit {
     emailNotifications: true,
     emailSignatureUrl: null,
     emailLogoUrl: null,
+    companyAddress: '',
     offboardingRejectionTemplate: '',
     offboardingAcceptanceTemplate: '',
     onboardingTemplateEmployee: '',
-    onboardingTemplateIntern: ''
+    onboardingTemplateIntern: '',
+    shortlistInterviewTemplate: '',
+    applicationRejectionTemplate: ''
   });
   defaultPassword = signal<string>('');
+  roles = signal<{ name: string, isEmployee: boolean, isIntern: boolean }[]>([]);
+  rolesActiveFilter = signal<'all' | 'employee' | 'intern' | 'both' | 'careers'>('all');
+  rolesSearchQuery = signal<string>('');
   employeeRoles = signal<string[]>([]);
   internRoles = signal<string[]>([]);
   leavePolicies = signal<any[]>([
     { name: 'Casual Leave', allowance: 12, frequency: 'annual', appliesTo: 'both' },
     { name: 'Sick Leave', allowance: 12, frequency: 'annual', appliesTo: 'both' }
   ]);
+  careerPostings = signal<any[]>([]);
+
+  filteredRoles = computed(() => {
+    const query = (this.rolesSearchQuery() || '').toLowerCase().trim();
+    const filter = this.rolesActiveFilter();
+    let list = this.roles() || [];
+
+    if (query) {
+      list = list.filter(r => (r?.name || '').toLowerCase().includes(query));
+    }
+
+    if (filter === 'employee') {
+      list = list.filter(r => r?.isEmployee);
+    } else if (filter === 'intern') {
+      list = list.filter(r => r?.isIntern);
+    } else if (filter === 'both') {
+      list = list.filter(r => r?.isEmployee && r?.isIntern);
+    } else if (filter === 'careers') {
+      list = list.filter(r => r?.name && this.isRoleListedInCareers(r.name));
+    }
+
+    return list;
+  });
+
+  rolesCountAll = computed(() => (this.roles() || []).length);
+  rolesCountEmployee = computed(() => (this.roles() || []).filter(r => r?.isEmployee).length);
+  rolesCountIntern = computed(() => (this.roles() || []).filter(r => r?.isIntern).length);
+  rolesCountBoth = computed(() => (this.roles() || []).filter(r => r?.isEmployee && r?.isIntern).length);
+  rolesCountCareers = computed(() => (this.roles() || []).filter(r => r?.name && this.isRoleListedInCareers(r.name)).length);
+
+  // Career Modal State
+  isCareerModalOpen = signal<boolean>(false);
+  isSavingCareerPosting = signal<boolean>(false);
+  currentEditingJob = signal<any | null>(null);
+  tempResponsibility = signal<string>('');
+  tempRequirement = signal<string>('');
+  tempTag = signal<string>('');
+
+  // Assessment Modal State
+  isAssessmentModalOpen = signal<boolean>(false);
+  isSavingAssessment = signal<boolean>(false);
+  currentAssessmentRoleName = signal<string>('');
+  currentEditingAssessment = signal<any | null>(null);
 
   // Default Payroll settings
   defaultEmployeeBasic = signal<number>(35000);
@@ -138,7 +187,7 @@ export class AppSettings implements OnInit {
   workDurationIntern   = signal<number>(6);
   showInRegistrationDropdown = signal<boolean>(true);
 
-  activeTab = signal<'locations' | 'communication' | 'employee_roles' | 'intern_roles' | 'payroll_settings' | 'system_settings' | 'leave_policies' | 'walkin_drives'>('locations');
+  activeTab = signal<'locations' | 'communication' | 'employee_roles' | 'intern_roles' | 'company_roles' | 'payroll_settings' | 'system_settings' | 'leave_policies' | 'walkin_drives'>('locations');
 
   isSaving = signal(false);
   isLoading = signal(true);
@@ -200,26 +249,51 @@ export class AppSettings implements OnInit {
             emailNotifications: true,
             emailSignatureUrl: null,
             emailLogoUrl: null,
+            companyAddress: s.companyAddress || res.offerLetterSettings?.address || 'Softrate Tech Park, No: 60A, Velleeswaran Kovil Street, Mangadu, Chennai - 600122',
             offboardingRejectionTemplate: '',
             offboardingAcceptanceTemplate: '',
             onboardingTemplateEmployee: '',
-            onboardingTemplateIntern: ''
+            onboardingTemplateIntern: '',
+            shortlistInterviewTemplate: '',
+            applicationRejectionTemplate: ''
           });
+          // Load Unified Roles
+          let unifiedRoles: { name: string, isEmployee: boolean, isIntern: boolean }[] = (s.roles || []).map((r: any) => ({ ...r }));
+          if (!unifiedRoles || unifiedRoles.length === 0) {
+            const empList: string[] = (s.employeeRoles || []).filter((r: any) => typeof r === 'string' && r.trim() && r !== 'Other');
+            const intList: string[] = (s.internRoles || []).filter((r: any) => typeof r === 'string' && r.trim() && r !== 'Other');
+            const empSet = new Set<string>(empList);
+            const intSet = new Set<string>(intList);
+            const combined: string[] = Array.from(new Set<string>([...empList, ...intList]));
+            unifiedRoles = combined.map((name: string) => ({
+              name,
+              isEmployee: empSet.has(name) || !intSet.has(name),
+              isIntern: intSet.has(name)
+            }));
+            if (unifiedRoles.length === 0) {
+              unifiedRoles = [{ name: 'Other', isEmployee: true, isIntern: true }];
+            }
+          }
+
+          // Ensure all careerPostings titles are represented in unifiedRoles so they appear in all tabs & "On Careers"
+          const existingRoleNames = new Set(unifiedRoles.map(r => (r?.name || '').trim().toLowerCase()));
+          (s.careerPostings || []).forEach((cp: any) => {
+            const title = (cp?.title || '').trim();
+            if (title && !existingRoleNames.has(title.toLowerCase())) {
+              const isIntern = cp.roleType === 'Internship' || cp.workType === 'Internship';
+              unifiedRoles.push({
+                name: title,
+                isEmployee: !isIntern || cp.roleType === 'Employee',
+                isIntern: isIntern
+              });
+              existingRoleNames.add(title.toLowerCase());
+            }
+          });
+
+          this.roles.set(unifiedRoles);
           this.employeeRoles.set(s.employeeRoles || []);
-          this.internRoles.set(s.internRoles || [
-            'Web developer',
-            'App developer',
-            'Artificial Intelligence',
-            'Data Analyst',
-            'Cybersecurity Analyst',
-            'Networking Analyst',
-            'Graphics Designer',
-            'Digital marketing',
-            'Business developer (Sales)',
-            'Research & Development (R&D)',
-            'HR Analyst',
-            'Other'
-          ]);
+          this.internRoles.set(s.internRoles || []);
+          this.careerPostings.set(s.careerPostings || []);
           this.showInRegistrationDropdown.set(s.showInRegistrationDropdown ?? true);
           this.leavePolicies.set((s.leavePolicies && s.leavePolicies.length > 0) ? s.leavePolicies : [
             { name: 'Casual Leave', allowance: 12, frequency: 'annual', appliesTo: 'both' },
@@ -358,14 +432,20 @@ export class AppSettings implements OnInit {
 
   saveAllSettings() {
     this.isSaving.set(true);
+
+    const empRoles = this.roles().filter(r => r.isEmployee && r.name !== 'Other').map(r => r.name);
+    const intRoles = this.roles().filter(r => r.isIntern && r.name !== 'Other').map(r => r.name);
+
     const payload = {
       defaultPassword: this.defaultPassword(),
       showInRegistrationDropdown: this.showInRegistrationDropdown(),
       receivingEmail: this.receivingEmail(),
       locations: this.locations(),
       communication: this.communication(),
-      employeeRoles: this.employeeRoles(),
-      internRoles: this.internRoles(),
+      roles: this.roles(),
+      employeeRoles: empRoles,
+      internRoles: intRoles,
+      careerPostings: this.careerPostings(),
       leavePolicies: this.leavePolicies(),
       payrollSettings: {
         pfCalculateEmployee: this.pfCalculateEmployee(),
@@ -483,32 +563,95 @@ export class AppSettings implements OnInit {
     return gross - pf - tax;
   }
   
+  // ==================== Unified Roles Management ====================
+  addUnifiedRole() {
+    const current = [...this.roles()];
+    current.push({
+      name: 'New Role',
+      isEmployee: true,
+      isIntern: false
+    });
+    this.roles.set(current);
+  }
+
+  removeUnifiedRole(target: number | any) {
+    let roles = [...this.roles()];
+    let index = typeof target === 'number' ? target : roles.indexOf(target);
+    if (index < 0 && target && target.name) {
+      index = roles.findIndex(r => (r.name || '').trim().toLowerCase() === (target.name || '').trim().toLowerCase());
+    }
+    if (index >= 0 && roles[index]) {
+      const roleToDelete = roles[index];
+      const roleName = (roleToDelete.name || '').trim();
+      if (roleName.toLowerCase() === 'other') {
+        this.alertService.show('The "Other" role cannot be deleted as it is required by the system.');
+        return;
+      }
+      
+      roles.splice(index, 1);
+      this.roles.set(roles);
+
+      // Also remove matching career posting if it exists
+      const cleanName = roleName.toLowerCase();
+      const updatedPostings = (this.careerPostings() || []).filter(
+        p => (p.title || '').trim().toLowerCase() !== cleanName
+      );
+      this.careerPostings.set(updatedPostings);
+
+      const empRoles = roles.filter(r => r.isEmployee && r.name !== 'Other').map(r => r.name);
+      const intRoles = roles.filter(r => r.isIntern && r.name !== 'Other').map(r => r.name);
+
+      // Persist directly to MongoDB
+      this.apiService.updateCompanySettings({
+        roles: roles,
+        employeeRoles: empRoles,
+        internRoles: intRoles,
+        careerPostings: updatedPostings
+      }).subscribe({
+        next: () => {
+          this.alertService.show(`Role "${roleName}" deleted successfully.`);
+        },
+        error: (err) => {
+          console.error('Failed to delete role:', err);
+          this.alertService.show(`Failed to delete role: ${err.error?.message || err.message}`);
+        }
+      });
+    }
+  }
+
+  updateUnifiedRoleName(target: number | any, name: string) {
+    const roles = [...this.roles()];
+    let index = typeof target === 'number' ? target : roles.indexOf(target);
+    if (index >= 0 && roles[index]) {
+      roles[index] = { ...roles[index], name };
+      this.roles.set(roles);
+    }
+  }
+
+  toggleUnifiedRoleFlag(target: number | any, flag: 'isEmployee' | 'isIntern') {
+    const roles = [...this.roles()];
+    let index = typeof target === 'number' ? target : roles.indexOf(target);
+    if (index >= 0 && roles[index]) {
+      const updated = { ...roles[index], [flag]: !roles[index][flag] };
+      // Keep at least one flag active
+      if (!updated.isEmployee && !updated.isIntern) {
+        updated[flag] = true;
+      }
+      roles[index] = updated;
+      this.roles.set(roles);
+    }
+  }
+
   addRole(type: 'employee' | 'intern') {
-    const roles = type === 'employee' ? this.employeeRoles() : this.internRoles();
-    roles.push('');
-    if (type === 'employee') this.employeeRoles.set([...roles]);
-    else this.internRoles.set([...roles]);
+    this.addUnifiedRole();
   }
 
   removeRole(type: 'employee' | 'intern', index: number) {
-    const roles = type === 'employee' ? this.employeeRoles() : this.internRoles();
-    
-    // Don't allow deleting 'Other'
-    if (roles[index].toLowerCase() === 'other') {
-      this.alertService.show('The "Other" role cannot be deleted as it is required by the system.');
-      return;
-    }
-
-    roles.splice(index, 1);
-    if (type === 'employee') this.employeeRoles.set([...roles]);
-    else this.internRoles.set([...roles]);
+    this.removeUnifiedRole(index);
   }
 
   updateRole(type: 'employee' | 'intern', index: number, value: string) {
-    const roles = type === 'employee' ? this.employeeRoles() : this.internRoles();
-    roles[index] = value;
-    if (type === 'employee') this.employeeRoles.set([...roles]);
-    else this.internRoles.set([...roles]);
+    this.updateUnifiedRoleName(index, value);
   }
 
   onSignatureUpload(event: Event) {
@@ -577,6 +720,356 @@ export class AppSettings implements OnInit {
 
   removeLeavePolicy(index: number) {
     this.leavePolicies.update(policies => policies.filter((_, i) => i !== index));
+  }
+
+  // ==================== Career Postings Management ====================
+  categoryOptions = [
+    { key: 'engineering', name: 'Engineering' },
+    { key: 'sales', name: 'Sales' },
+    { key: 'marketing', name: 'Marketing' },
+    { key: 'media', name: 'Creative Media' },
+    { key: 'design', name: 'Design & UI/UX' },
+    { key: 'hr', name: 'Human Resources' },
+    { key: 'operations', name: 'Operations' }
+  ];
+
+  getCareerPostingForRole(roleName: string): any | null {
+    if (!roleName) return null;
+    const clean = roleName.trim().toLowerCase();
+    return this.careerPostings().find(p => p.title?.trim().toLowerCase() === clean) || null;
+  }
+
+  isRoleListedInCareers(roleName: string): boolean {
+    const job = this.getCareerPostingForRole(roleName);
+    return !!(job && job.isListed !== false);
+  }
+
+  toggleRoleCareerListing(roleName: string, event: Event) {
+    event.stopPropagation();
+    const existing = this.getCareerPostingForRole(roleName);
+    if (existing) {
+      existing.isListed = !existing.isListed;
+      const updated = [...this.careerPostings()];
+      this.careerPostings.set(updated);
+      this.apiService.updateCompanySettings({ careerPostings: updated }).subscribe({
+        next: () => {
+          this.alertService.show(`"${roleName}" ${existing.isListed ? 'listed on' : 'unlisted from'} careers portal.`);
+        },
+        error: (err) => {
+          console.error(err);
+          this.alertService.show(`Failed to update listing: ${err.error?.message || err.message}`);
+        }
+      });
+    } else {
+      this.openCareerEditor(roleName);
+    }
+  }
+
+  inferCategoryFromRole(roleName: string): string {
+    const clean = (roleName || '').toLowerCase();
+    if (clean.includes('sales') || clean.includes('business development') || clean.includes('bde')) return 'sales';
+    if (clean.includes('market') || clean.includes('growth') || clean.includes('seo')) return 'marketing';
+    if (clean.includes('video') || clean.includes('media') || clean.includes('graph') || clean.includes('content') || clean.includes('editor')) return 'media';
+    if (clean.includes('design') || clean.includes('ui') || clean.includes('ux') || clean.includes('figma')) return 'design';
+    if (clean.includes('hr') || clean.includes('talent') || clean.includes('recruit')) return 'hr';
+    if (clean.includes('operation') || clean.includes('admin')) return 'operations';
+    return 'engineering';
+  }
+
+  openCareerEditor(roleName: string, defaultRoleType: 'Employee' | 'Internship' = 'Employee') {
+    const existing = this.getCareerPostingForRole(roleName);
+    if (existing) {
+      const cloned = JSON.parse(JSON.stringify(existing));
+      this.currentEditingJob.set(cloned);
+    } else {
+      // Find role in unified roles list to see if it's intern-focused
+      const rObj = this.roles().find(r => r.name?.toLowerCase() === roleName.toLowerCase());
+      const roleType = rObj ? (rObj.isEmployee ? 'Employee' : 'Internship') : defaultRoleType;
+
+      const defaultCategory = this.inferCategoryFromRole(roleName);
+      const categoryObj = this.categoryOptions.find(c => c.key === defaultCategory) || this.categoryOptions[0];
+      
+      const newJob = {
+        job_id: '193779' + Math.floor(100000000000 + Math.random() * 900000000000),
+        title: roleName,
+        category: categoryObj.key,
+        categoryName: categoryObj.name,
+        department: '',
+        location: '',
+        workType: roleType === 'Employee' ? 'Full-Time' : 'Internship',
+        is_important: false,
+        shortSummary: '',
+        about: '',
+        responsibilities: [],
+        requirements: [],
+        assessment: null,
+        note: '',
+        applyEmail: '',
+        tags: [],
+        roleType: roleType,
+        isListed: true
+      };
+      this.currentEditingJob.set(newJob);
+    }
+    this.tempResponsibility.set('');
+    this.tempRequirement.set('');
+    this.tempTag.set('');
+    this.isCareerModalOpen.set(true);
+  }
+
+  // ==================== Assessment Builder Helpers ====================
+
+  getRoleAssessment(roleName: string): any {
+    if (!roleName) return null;
+    const clean = roleName.trim().toLowerCase();
+    const posting = this.careerPostings().find(p => p.title?.trim().toLowerCase() === clean);
+    if (posting && posting.assessment) {
+      return posting.assessment;
+    }
+    return null;
+  }
+
+  openAssessmentEditor(roleName: string) {
+    this.currentAssessmentRoleName.set(roleName);
+    const clean = roleName.trim().toLowerCase();
+    const posting = this.careerPostings().find(p => p.title?.trim().toLowerCase() === clean);
+
+    if (posting && posting.assessment) {
+      this.currentEditingAssessment.set(JSON.parse(JSON.stringify(posting.assessment)));
+    } else {
+      // Start with a blank assessment for the admin to fill in
+      this.currentEditingAssessment.set({
+        enabled: true,
+        title: `${roleName} Assessment`,
+        description: '',
+        questions: []
+      });
+    }
+    this.isAssessmentModalOpen.set(true);
+  }
+
+  closeAssessmentModal() {
+    this.isAssessmentModalOpen.set(false);
+    this.currentEditingAssessment.set(null);
+    this.currentAssessmentRoleName.set('');
+  }
+
+  saveAssessmentModal() {
+    const roleName = this.currentAssessmentRoleName();
+    const assessmentData = this.currentEditingAssessment();
+    if (!roleName || !assessmentData) return;
+
+    const currentList = [...this.careerPostings()];
+    const cleanRole = roleName.trim().toLowerCase();
+    const existingIndex = currentList.findIndex(p => p.title?.trim().toLowerCase() === cleanRole);
+
+    if (existingIndex >= 0) {
+      currentList[existingIndex] = {
+        ...currentList[existingIndex],
+        assessment: assessmentData,
+        updatedAt: new Date()
+      };
+    } else {
+      const roleObj = this.roles().find(r => r.name?.trim().toLowerCase() === cleanRole);
+      const roleType = roleObj?.isIntern && !roleObj?.isEmployee ? 'Internship' : 'Employee';
+      const defaultCategory = this.inferCategoryFromRole(roleName);
+      const categoryObj = this.categoryOptions.find(c => c.key === defaultCategory) || this.categoryOptions[0];
+
+      const newJob = {
+        job_id: '193779' + Math.floor(100000000000 + Math.random() * 900000000000),
+        title: roleName,
+        category: categoryObj.key,
+        categoryName: categoryObj.name,
+        roleType: roleType,
+        assessment: assessmentData,
+        isListed: false
+      };
+      currentList.push(newJob);
+    }
+
+    this.isSavingAssessment.set(true);
+
+    // Save directly to MongoDB via API
+    this.apiService.updateCompanySettings({ careerPostings: currentList }).pipe(
+      finalize(() => this.isSavingAssessment.set(false))
+    ).subscribe({
+      next: () => {
+        this.careerPostings.set(currentList);
+        this.isAssessmentModalOpen.set(false);
+        this.currentEditingAssessment.set(null);
+        this.alertService.show(`Assessment for "${roleName}" saved successfully!`);
+      },
+      error: (err) => {
+        this.alertService.show(`Failed to save assessment: ${err.error?.message || err.message}`);
+      }
+    });
+  }
+
+  addAssessmentModalQuestion() {
+    const ass = this.currentEditingAssessment();
+    if (!ass) return;
+    if (!ass.questions) ass.questions = [];
+    ass.questions.push({
+      id: 'q_' + Date.now(),
+      label: 'New Question',
+      type: 'text',
+      options: ['Option 1', 'Option 2'],
+      required: true,
+      placeholder: 'Enter response here...',
+      minLinks: 1,
+      maxLinks: 5
+    });
+    this.currentEditingAssessment.set({ ...ass });
+  }
+
+  removeAssessmentModalQuestion(index: number) {
+    const ass = this.currentEditingAssessment();
+    if (!ass || !ass.questions) return;
+    ass.questions.splice(index, 1);
+    this.currentEditingAssessment.set({ ...ass });
+  }
+
+  addOptionToAssessmentModalQuestion(question: any, inputElem: HTMLInputElement) {
+    const optText = inputElem.value.trim();
+    if (!optText) return;
+    if (!question.options) question.options = [];
+    if (!question.options.includes(optText)) {
+      question.options.push(optText);
+    }
+    inputElem.value = '';
+    const ass = this.currentEditingAssessment();
+    if (ass) this.currentEditingAssessment.set({ ...ass });
+  }
+
+  removeOptionFromAssessmentModalQuestion(question: any, optIndex: number) {
+    if (!question.options) return;
+    question.options.splice(optIndex, 1);
+    const ass = this.currentEditingAssessment();
+    if (ass) this.currentEditingAssessment.set({ ...ass });
+  }
+
+  onCategoryChange(catKey: string) {
+    const job = this.currentEditingJob();
+    if (!job) return;
+    const cat = this.categoryOptions.find(c => c.key === catKey);
+    if (cat) {
+      job.category = cat.key;
+      job.categoryName = cat.name;
+      this.currentEditingJob.set({ ...job });
+    }
+  }
+
+  addResponsibility() {
+    const text = this.tempResponsibility().trim();
+    if (!text) return;
+    const job = this.currentEditingJob();
+    if (!job) return;
+    if (!job.responsibilities) job.responsibilities = [];
+    job.responsibilities.push(text);
+    this.currentEditingJob.set({ ...job });
+    this.tempResponsibility.set('');
+  }
+
+  removeResponsibility(index: number) {
+    const job = this.currentEditingJob();
+    if (!job || !job.responsibilities) return;
+    job.responsibilities.splice(index, 1);
+    this.currentEditingJob.set({ ...job });
+  }
+
+  addRequirement() {
+    const text = this.tempRequirement().trim();
+    if (!text) return;
+    const job = this.currentEditingJob();
+    if (!job) return;
+    if (!job.requirements) job.requirements = [];
+    job.requirements.push(text);
+    this.currentEditingJob.set({ ...job });
+    this.tempRequirement.set('');
+  }
+
+  removeRequirement(index: number) {
+    const job = this.currentEditingJob();
+    if (!job || !job.requirements) return;
+    job.requirements.splice(index, 1);
+    this.currentEditingJob.set({ ...job });
+  }
+
+  addTag() {
+    const text = this.tempTag().trim();
+    if (!text) return;
+    const job = this.currentEditingJob();
+    if (!job) return;
+    if (!job.tags) job.tags = [];
+    if (!job.tags.includes(text)) {
+      job.tags.push(text);
+    }
+    this.currentEditingJob.set({ ...job });
+    this.tempTag.set('');
+  }
+
+  removeTag(index: number) {
+    const job = this.currentEditingJob();
+    if (!job || !job.tags) return;
+    job.tags.splice(index, 1);
+    this.currentEditingJob.set({ ...job });
+  }
+
+  saveCareerPostingModal() {
+    const job = this.currentEditingJob();
+    if (!job || !job.title) {
+      this.alertService.show('Job title is required.');
+      return;
+    }
+
+
+    const currentList = [...this.careerPostings()];
+    const cleanTitle = job.title.trim().toLowerCase();
+    const existingIndex = currentList.findIndex(p => p.job_id === job.job_id || (p.title?.trim().toLowerCase() === cleanTitle && p.roleType === job.roleType));
+
+    if (existingIndex >= 0) {
+      currentList[existingIndex] = { ...job, isListed: true, updatedAt: new Date() };
+    } else {
+      currentList.push({ ...job, isListed: true, createdAt: new Date(), updatedAt: new Date() });
+    }
+
+    this.isSavingCareerPosting.set(true);
+
+    // Also ensure role exists in unified roles list
+    const currentRoles = [...this.roles()];
+    const hasRole = currentRoles.some(r => r.name?.trim().toLowerCase() === cleanTitle);
+    if (!hasRole) {
+      const isIntern = job.roleType === 'Internship' || job.workType === 'Internship';
+      currentRoles.push({
+        name: job.title.trim(),
+        isEmployee: !isIntern || job.roleType === 'Employee',
+        isIntern: isIntern
+      });
+      this.roles.set(currentRoles);
+    }
+
+    // Save directly to MongoDB via API
+    this.apiService.updateCompanySettings({ 
+      careerPostings: currentList,
+      roles: currentRoles 
+    }).pipe(
+      finalize(() => this.isSavingCareerPosting.set(false))
+    ).subscribe({
+      next: () => {
+        this.careerPostings.set(currentList);
+        this.isCareerModalOpen.set(false);
+        this.currentEditingJob.set(null);
+        this.alertService.show(`Career posting for "${job.title}" saved successfully!`);
+      },
+      error: (err) => {
+        this.alertService.show(`Failed to save career posting: ${err.error?.message || err.message}`);
+      }
+    });
+  }
+
+  closeCareerModal() {
+    this.isCareerModalOpen.set(false);
+    this.currentEditingJob.set(null);
   }
 
   trackByIndex(index: number, item: any): any {
