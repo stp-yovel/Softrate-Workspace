@@ -1033,6 +1033,10 @@ export class ApiService {
     return this.http.post(`${this.baseUrl}/api/campus-hiring/drives`, driveData, { headers: this.getHeaders() });
   }
 
+  updateCampusDrive(driveId: string, driveData: any): Observable<any> {
+    return this.http.put(`${this.baseUrl}/api/campus-hiring/drives/${driveId}`, driveData, { headers: this.getHeaders() });
+  }
+
   getCampusDrives(collegeId?: string, academicYear?: string): Observable<any[]> {
     let url = `${this.baseUrl}/api/campus-hiring/drives`;
     const params: string[] = [];
@@ -1090,6 +1094,14 @@ export class ApiService {
 
   createLMSCourse(payload: any): Observable<any> {
     return this.http.post<any>(`${this.baseUrl}/api/lms/courses`, payload, { headers: this.getHeaders() });
+  }
+
+  updateLMSCourse(courseId: string, payload: any): Observable<any> {
+    return this.http.put<any>(`${this.baseUrl}/api/lms/courses/${courseId}`, payload, { headers: this.getHeaders() });
+  }
+
+  updateLMSCourseVisibility(courseId: string, visibility: string): Observable<any> {
+    return this.http.patch<any>(`${this.baseUrl}/api/lms/courses/${courseId}/visibility`, { visibility }, { headers: this.getHeaders() });
   }
 
   assignLMSCourse(payload: { courseId: string; userId: string; userType: string; userEmail?: string; userName?: string }): Observable<any> {

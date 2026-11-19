@@ -25,6 +25,11 @@ const LMSCourseSchema = new mongoose.Schema({
   category: { type: String, default: 'Onboarding' },
   bannerUrl: { type: String, default: '' },
   thumbnailUrl: { type: String, default: '' },
+  visibility: {
+    type: String,
+    enum: ['all', 'interns', 'employees', 'private'],
+    default: 'all',
+  },
   status: { type: String, enum: ['active', 'draft', 'archived'], default: 'active' },
   videos: [videoItemSchema],
 }, { timestamps: true });

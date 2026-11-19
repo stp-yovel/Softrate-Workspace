@@ -44,6 +44,72 @@ function deleteStudentResume(student) {
 }
 
 /**
+ * Helper: Safely parse Date of Birth from various string formats (DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, plain digits, Excel numbers)
+ * Returns a valid Date object or undefined (never returns Invalid Date)
+ */
+function parseSafeDob(val) {
+  if (!val) return undefined;
+  if (val instanceof Date) {
+    return isNaN(val.getTime()) ? undefined : val;
+  }
+  if (typeof val === 'number') {
+    if (val > 1000 && val < 100000) {
+      // Excel serial date offset (Dec 30, 1899)
+      const excelEpoch = new Date(Date.UTC(1899, 11, 30));
+      const d = new Date(excelEpoch.getTime() + val * 86400000);
+      if (!isNaN(d.getTime())) return d;
+    }
+    const d = new Date(val);
+    if (!isNaN(d.getTime())) return d;
+  }
+  if (typeof val === 'string') {
+    const s = val.trim();
+    if (!s || s.toLowerCase() === 'n/a' || s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined' || s.toLowerCase() === 'not recorded') {
+      return undefined;
+    }
+
+    // Check DD-MM-YYYY or DD/MM/YYYY or DD.MM.YYYY
+    const dmyMatch = s.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})$/);
+    if (dmyMatch) {
+      const day = parseInt(dmyMatch[1], 10);
+      const month = parseInt(dmyMatch[2], 10) - 1;
+      const year = parseInt(dmyMatch[3], 10);
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900 && year <= 2100) {
+        const d = new Date(Date.UTC(year, month, day));
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+
+    // Check YYYY-MM-DD or YYYY/MM/DD
+    const ymdMatch = s.match(/^(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})$/);
+    if (ymdMatch) {
+      const year = parseInt(ymdMatch[1], 10);
+      const month = parseInt(ymdMatch[2], 10) - 1;
+      const day = parseInt(ymdMatch[3], 10);
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900 && year <= 2100) {
+        const d = new Date(Date.UTC(year, month, day));
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+
+    // Plain digits DDMMYYYY e.g. 15082002
+    if (/^\d{8}$/.test(s)) {
+      const day = parseInt(s.slice(0, 2), 10);
+      const month = parseInt(s.slice(2, 4), 10) - 1;
+      const year = parseInt(s.slice(4), 10);
+      if (day >= 1 && day <= 31 && month >= 0 && month <= 11 && year >= 1900 && year <= 2100) {
+        const d = new Date(Date.UTC(year, month, day));
+        if (!isNaN(d.getTime())) return d;
+      }
+    }
+
+    const d = new Date(s);
+    if (!isNaN(d.getTime())) return d;
+  }
+  return undefined;
+}
+
+/**
  * Onboard a new College
  */
 exports.createCollege = async (req, res) => {
@@ -712,6 +778,67 @@ exports.getDriveById = async (req, res) => {
 };
 
 /**
+ * Update an existing Campus Hiring Drive
+ */
+exports.updateCampusDrive = async (req, res) => {
+  try {
+    const CampusDriveModel = req.models && req.models.CampusDrive ? req.models.CampusDrive : CampusDrive;
+    const companyId = req.tenant ? req.tenant.companyId : null;
+    const { id } = req.params;
+
+    const drive = await CampusDriveModel.findOne({ _id: id, companyId });
+    if (!drive) {
+      return res.status(404).json({ message: 'Campus Drive not found' });
+    }
+
+    const {
+      title,
+      roles,
+      startDate,
+      endDate,
+      rounds,
+      description,
+      status,
+      academicYear
+    } = req.body;
+
+    if (title && title.trim()) drive.title = title.trim();
+    if (academicYear && academicYear.trim()) drive.academicYear = academicYear.trim();
+    if (Array.isArray(roles) && roles.length > 0) {
+      drive.roles = roles.filter(r => r && typeof r === 'string' && r.trim());
+    }
+    if (startDate) drive.startDate = new Date(startDate);
+    if (endDate) drive.endDate = new Date(endDate);
+    if (description !== undefined) drive.description = description;
+    if (status) drive.status = status;
+
+    if (rounds && Array.isArray(rounds) && rounds.length > 0) {
+      const formattedRounds = rounds.map((r, idx) => ({
+        roundId: r.roundId || `round_${idx + 1}_${Date.now()}`,
+        name: r.name || `Round ${idx + 1}`,
+        order: typeof r.order === 'number' ? r.order : idx + 1,
+        isActive: r.isActive !== false,
+        description: r.description || '',
+        isHireProLinked: Boolean(r.isHireProLinked),
+        hireProExamMapping: Array.isArray(r.hireProExamMapping) ? r.hireProExamMapping.map(m => ({
+          role: (m.role || '').trim(),
+          examId: (m.examId || '').trim(),
+          examTitle: (m.examTitle || '').trim()
+        })) : []
+      }));
+      formattedRounds.sort((a, b) => a.order - b.order);
+      drive.rounds = formattedRounds;
+    }
+
+    await drive.save();
+    return res.status(200).json({ message: 'Campus Drive updated successfully', drive });
+  } catch (error) {
+    console.error('Error updating campus drive:', error);
+    return res.status(500).json({ message: 'Server error updating campus drive', error: error.message });
+  }
+};
+
+/**
  * Import Students into Drive (via Excel Mapping)
  */
 exports.importStudents = async (req, res) => {
@@ -763,7 +890,8 @@ exports.importStudents = async (req, res) => {
           existing.fullName = fullName;
           existing.email = email;
           existing.phone = phone || existing.phone;
-          if (s.dob) existing.dob = new Date(s.dob);
+          const parsedDob = parseSafeDob(s.dob);
+          if (parsedDob) existing.dob = parsedDob;
           if (s.department) existing.department = s.department;
           if (s.degree) existing.degree = s.degree;
           if (s.cgpa) existing.cgpa = s.cgpa.toString();
@@ -779,7 +907,7 @@ exports.importStudents = async (req, res) => {
           collegeId: drive.collegeId,
           rollNumber,
           fullName,
-          dob: s.dob ? new Date(s.dob) : undefined,
+          dob: parseSafeDob(s.dob),
           email,
           phone: phone || '',
           department: s.department || '',
@@ -1441,7 +1569,12 @@ async function findStudentAcrossDrives(rollNumber, companyId, reqModels, driveCr
 
   async function checkModels(models) {
     if (!models || !models.CampusStudent) return null;
-    let query = { rollNumber: rollRegex };
+    let query = {
+      $or: [
+        { rollNumber: rollRegex },
+        { email: cleanRoll.toLowerCase() }
+      ]
+    };
     if (driveCriteria && driveCriteria.driveId) {
       query.driveId = driveCriteria.driveId;
     }
@@ -1571,10 +1704,12 @@ exports.verifyHireProCandidate = async (req, res) => {
       });
     }
 
-    // Password verification: Validate against candidate DOB or Roll Number
+    // Password verification: Validate against candidate DOB, Phone Number, or Roll Number
     if (password) {
       const cleanPass = password.toString().trim().toLowerCase();
-      const cleanRoll = student.rollNumber.toString().trim().toLowerCase();
+      const cleanRoll = (student.rollNumber || '').toString().trim().toLowerCase();
+      const cleanPhone = (student.phone || '').toString().trim().replace(/[^0-9]/g, '');
+      const inputDigits = cleanPass.replace(/[^0-9]/g, '');
 
       let dobMatches = false;
       if (student.dob) {
@@ -1583,23 +1718,29 @@ exports.verifyHireProCandidate = async (req, res) => {
           const yyyy = d.getFullYear();
           const mm = String(d.getMonth() + 1).padStart(2, '0');
           const dd = String(d.getDate()).padStart(2, '0');
-          const dobFormats = [
-            `${yyyy}-${mm}-${dd}`,
-            `${dd}-${mm}-${yyyy}`,
-            `${yyyy}${mm}${dd}`,
-            `${dd}${mm}${yyyy}`,
-            `${dd}/${mm}/${yyyy}`,
-            `${mm}/${dd}/${yyyy}`
-          ];
-          dobMatches = dobFormats.some(fmt => fmt.toLowerCase() === cleanPass);
+          const ddmmyyyy = `${dd}${mm}${yyyy}`;
+          const yyyymmdd = `${yyyy}${mm}${dd}`;
+
+          // Match plain digits DDMMYYYY (e.g. 15082002 - no dashes or slashes needed)
+          dobMatches = (
+            inputDigits === ddmmyyyy ||
+            inputDigits === yyyymmdd ||
+            cleanPass === ddmmyyyy ||
+            cleanPass === `${dd}-${mm}-${yyyy}` ||
+            cleanPass === `${dd}/${mm}/${yyyy}` ||
+            cleanPass === `${yyyy}-${mm}-${dd}`
+          );
         }
       }
 
-      const rollMatches = cleanPass === cleanRoll;
-      if (!dobMatches && !rollMatches) {
+      const rollMatches = cleanRoll && cleanPass === cleanRoll;
+      const phoneMatches = cleanPhone && (cleanPass === cleanPhone || (inputDigits.length >= 10 && cleanPhone.endsWith(inputDigits)));
+      const isDefaultCompanyPass = cleanPass === 'softrate@123' || (student.password && cleanPass === student.password.toLowerCase());
+
+      if (!dobMatches && !rollMatches && !phoneMatches && !isDefaultCompanyPass) {
         return res.status(401).json({
           success: false,
-          message: 'Invalid password. Please enter your Date of Birth (YYYY-MM-DD or DD-MM-YYYY) or Roll Number.'
+          message: 'Invalid password. Please enter your Date of Birth in DDMMYYYY format (e.g. 15082002), Company Default Password (Softrate@123), Phone Number, or Roll Number.'
         });
       }
     }

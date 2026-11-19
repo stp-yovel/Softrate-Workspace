@@ -39,6 +39,8 @@ router.post('/colleges/:id/academic-years', verifyTenant, campusHiringController
 
 // Campus Drive routes
 router.post('/drives', verifyTenant, campusHiringController.createCampusDrive);
+router.put('/drives/:id', verifyTenant, campusHiringController.updateCampusDrive);
+router.patch('/drives/:id', verifyTenant, campusHiringController.updateCampusDrive);
 router.get('/drives', verifyTenant, campusHiringController.getDrives);
 router.get('/drives/:id', verifyTenant, campusHiringController.getDriveById);
 

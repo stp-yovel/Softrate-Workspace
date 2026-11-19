@@ -414,10 +414,16 @@
               <span class="drive-status-pill">{{ drive.status || 'Scheduled' }}</span>
             </td>
             <td class="td-actions">
-              <button class="btn-table-view" (click)="selectDrive(drive); $event.stopPropagation()">
-                <span>View Students</span>
-                <hugeicons-icon [icon]="ArrowRight01Icon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
-              </button>
+              <div class="table-actions-flex">
+                <button class="btn-table-edit" (click)="openEditDriveModal(drive, $event)" title="Edit Drive Details">
+                  <hugeicons-icon [icon]="PencilEdit02Icon" size="14" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+                  <span>Edit</span>
+                </button>
+                <button class="btn-table-view" (click)="selectDrive(drive); $event.stopPropagation()">
+                  <span>View Students</span>
+                  <hugeicons-icon [icon]="ArrowRight01Icon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -476,6 +482,11 @@
 
       <!-- Action Tools -->
       <div class="workspace-actions">
+        <button class="btn-outline" (click)="openEditDriveModal(selectedDrive())" title="Edit Drive">
+          <hugeicons-icon [icon]="PencilEdit02Icon" size="16" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
+          <span>Edit Drive</span>
+        </button>
+
         <button class="btn-outline" (click)="downloadSampleExcelTemplate()" title="Download sample format">
           <hugeicons-icon [icon]="Download01Icon" size="16" [strokeWidth]="1.8" color="#475569"></hugeicons-icon>
           <span>Excel Template</span>
@@ -1203,6 +1214,182 @@
       <div class="modal-footer">
         <button class="btn-secondary" (click)="closeCreateDriveModal()">Cancel</button>
         <button class="btn-primary-ai" (click)="submitCreateDrive()" [disabled]="isLoading()">Create Drive</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================= -->
+  <!-- MODAL: EDIT CAMPUS DRIVE                                                  -->
+  <!-- ========================================================================= -->
+  <div class="modal-backdrop" *ngIf="showEditDriveModal()">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-header">
+        <div class="modal-title-flex">
+          <div>
+            <h3>Edit Campus Hiring Drive</h3>
+            <p>Update role profiles, schedule dates, and customize the sequence of interview rounds.</p>
+          </div>
+        </div>
+        <button class="btn-close-modal" (click)="closeEditDriveModal()">×</button>
+      </div>
+
+      <div class="modal-body form-grid-scroll">
+        <div class="form-row">
+          <div class="form-group flex-2">
+            <label>Drive Title <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="driveForm.title" placeholder="e.g. Engineering Campus Recruitment 2025" />
+          </div>
+          <div class="form-group flex-1">
+            <label>Academic Year <span class="required">*</span></label>
+            <input type="text" [(ngModel)]="driveForm.academicYear" placeholder="2025-2026" />
+          </div>
+        </div>
+
+        <!-- Multi-Role Selection from Company Settings -->
+        <div class="form-group">
+          <label>Target Roles (Choose Multiple from Company Settings) <span class="required">*</span></label>
+          <div class="roles-selection-chips">
+            <button 
+              type="button" 
+              class="role-select-chip" 
+              *ngFor="let role of availableCompanyRoles()"
+              [class.selected]="isRoleSelected(role)"
+              (click)="toggleRoleSelection(role)"
+            >
+              <span class="check-box-icon" *ngIf="isRoleSelected(role)">✓</span>
+              <span>{{ role }}</span>
+            </button>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group flex-1">
+            <label>Start Date <span class="required">*</span></label>
+            <input type="date" [(ngModel)]="driveForm.startDate" />
+          </div>
+          <div class="form-group flex-1">
+            <label>End Date <span class="required">*</span></label>
+            <input type="date" [(ngModel)]="driveForm.endDate" />
+          </div>
+        </div>
+
+        <!-- Configurable & Reorderable Interview Rounds -->
+        <div class="form-section-title">Interview Rounds Pipeline (Order & Enable/Disable)</div>
+        <p class="rounds-desc">Use the Up and Down controls to adjust round order. Candidates will progress sequentially through these rounds.</p>
+        
+        <div class="rounds-builder-list">
+          <div class="round-builder-item-wrapper" *ngFor="let round of driveForm.rounds; let idx = index">
+            <div class="round-builder-item" [class.linked-active]="round.isHireProLinked">
+              <div class="item-left">
+                <input type="checkbox" [(ngModel)]="round.isActive" id="edit_round_{{ idx }}" />
+                <label for="edit_round_{{ idx }}" class="round-order-num">Round {{ idx + 1 }}</label>
+                <input type="text" [(ngModel)]="round.name" class="round-name-input" />
+              </div>
+
+              <div class="item-actions">
+                <!-- Link with HirePro Toggle Button: Available only on Round 2+ (Not Resume Screening) -->
+                <button 
+                  *ngIf="round.order > 1 && !round.name.toLowerCase().includes('resume')"
+                  type="button" 
+                  class="btn-hirepro-toggle" 
+                  [class.active]="round.isHireProLinked"
+                  (click)="toggleHireProLink(idx)"
+                  [title]="round.isHireProLinked ? 'HirePro Assessment Enabled' : 'Link with HirePro'">
+                  <hugeicons-icon [icon]="Link01Icon" size="13" [strokeWidth]="2" [color]="round.isHireProLinked ? '#2563eb' : '#64748b'"></hugeicons-icon>
+                  <span>{{ round.isHireProLinked ? 'Linked with HirePro' : 'Link with HirePro' }}</span>
+                </button>
+                <span class="round-badge-screening" *ngIf="round.order === 1 || round.name.toLowerCase().includes('resume')">
+                  Resume Screening
+                </span>
+
+                <button 
+                  type="button" 
+                  class="btn-order-arrow" 
+                  (click)="moveRoundUp(idx)" 
+                  [disabled]="idx === 0" 
+                  title="Move Up"
+                >
+                  <hugeicons-icon [icon]="ArrowUp01Icon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+                </button>
+
+                <button 
+                  type="button" 
+                  class="btn-order-arrow" 
+                  (click)="moveRoundDown(idx)" 
+                  [disabled]="idx === driveForm.rounds.length - 1" 
+                  title="Move Down"
+                >
+                  <hugeicons-icon [icon]="ArrowDown01Icon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+                </button>
+
+                <button 
+                  type="button" 
+                  class="btn-delete-round" 
+                  (click)="removeRound(idx)" 
+                  [disabled]="driveForm.rounds.length <= 1"
+                  title="Remove Round"
+                >
+                  <hugeicons-icon [icon]="Delete01Icon" size="14" [strokeWidth]="1.8" color="#dc2626"></hugeicons-icon>
+                </button>
+              </div>
+            </div>
+
+            <!-- HirePro Assessment Mapping per Selected Role (Appears when Linked with HirePro) -->
+            <div class="hirepro-mapping-subpanel" *ngIf="round.isHireProLinked && round.order > 1">
+              <div class="subpanel-title">
+                <hugeicons-icon [icon]="Link01Icon" size="14" [strokeWidth]="2" color="#2563eb"></hugeicons-icon>
+                <span>HirePro Assessment Mapping for Round {{ round.order }} ({{ round.name }})</span>
+              </div>
+              <p class="subpanel-hint">Map each target role to a HirePro test or exam so shortlisted candidates receive the assessment link.</p>
+
+              <div class="role-exam-mapping-table" *ngIf="driveForm.roles.length > 0; else noRolesForExam">
+                <div class="mapping-row" *ngFor="let role of driveForm.roles">
+                  <div class="mapping-role-name">
+                    <span class="role-bullet">•</span>
+                    <strong>{{ role }}</strong>
+                  </div>
+                  <div class="mapping-exam-select">
+                    <select 
+                      [ngModel]="getExamMappingForRole(round, role)" 
+                      (ngModelChange)="setExamMappingForRole(round, role, $event)"
+                    >
+                      <option value="">-- Do not send HirePro exam for this role --</option>
+                      <option *ngFor="let exam of hireProExams()" [value]="exam._id">
+                        {{ exam.title }} (Duration: {{ exam.duration }}m, Passing: {{ exam.passingPercentage || 60 }}%)
+                      </option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              <ng-template #noRolesForExam>
+                <div class="no-roles-warning">
+                  <span>Please select target roles above to map them with HirePro exams.</span>
+                </div>
+              </ng-template>
+            </div>
+          </div>
+        </div>
+
+        <!-- Add Custom Round Input -->
+        <div class="add-custom-round-row">
+          <input 
+            type="text" 
+            placeholder="New custom round name (e.g. Coding Assessment, Case Study)" 
+            [ngModel]="customRoundName()" 
+            (ngModelChange)="customRoundName.set($event)" 
+          />
+          <button type="button" class="btn-secondary-sm" (click)="addCustomRound()">
+            <hugeicons-icon [icon]="PlusSignIcon" size="14" [strokeWidth]="2" color="#475569"></hugeicons-icon>
+            <span>Add Round</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn-secondary" (click)="closeEditDriveModal()">Cancel</button>
+        <button class="btn-primary-ai" (click)="submitUpdateDrive()" [disabled]="isUpdatingDrive()">
+          {{ isUpdatingDrive() ? 'Saving Changes...' : 'Save Changes' }}
+        </button>
       </div>
     </div>
   </div>

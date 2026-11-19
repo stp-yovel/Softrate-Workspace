@@ -125,6 +125,7 @@
             <th scope="col">Category & Code</th>
             <th scope="col">Curriculum</th>
             <th scope="col">Progression Rule</th>
+            <th scope="col">Audience Access</th>
             <th scope="col">Status</th>
             <th scope="col" class="text-right">Actions</th>
           </tr>
@@ -168,18 +169,69 @@
               </div>
             </td>
             <td>
+              <div class="visibility-menu-wrapper">
+                <span
+                  class="visibility-badge"
+                  [ngClass]="course.visibility || 'all'"
+                  [title]="'Audience: ' + getVisibilityLabel(course.visibility || 'all')"
+                >
+                  <hugeicons-icon
+                    *ngIf="(course.visibility || 'all') === 'all'"
+                    [icon]="Globe02Icon"
+                    size="13"
+                    [strokeWidth]="1.5"
+                    color="currentColor"
+                  ></hugeicons-icon>
+                  <hugeicons-icon
+                    *ngIf="(course.visibility || 'all') !== 'all'"
+                    [icon]="UserGroupIcon"
+                    size="13"
+                    [strokeWidth]="1.5"
+                    color="currentColor"
+                  ></hugeicons-icon>
+                  <span>{{ getVisibilityLabel(course.visibility || 'all') }}</span>
+                </span>
+                <select
+                  class="visibility-quick-select"
+                  [ngModel]="course.visibility || 'all'"
+                  (ngModelChange)="updateVisibility(course, $event)"
+                  aria-label="Change course audience"
+                  title="Click to change audience access"
+                >
+                  <option value="all">Overall Public</option>
+                  <option value="interns">Public to Interns</option>
+                  <option value="employees">Public to Employees</option>
+                  <option value="private">Assigned Only</option>
+                </select>
+              </div>
+            </td>
+            <td>
               <span class="status-pill active">{{ course.status || 'Active' }}</span>
             </td>
             <td class="text-right">
-              <button
-                type="button"
-                class="btn-assign-row"
-                (click)="openAssignModal(course)"
-                aria-label="Assign course to employee or intern"
-              >
-                <hugeicons-icon [icon]="UserGroupIcon" size="14" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
-                <span>Assign</span>
-              </button>
+              <div class="row-actions-group">
+                <button
+                  type="button"
+                  class="btn-edit-row"
+                  (click)="openEditCourseModal(course)"
+                  aria-label="Edit course details and curriculum"
+                  title="Edit Course"
+                >
+                  <hugeicons-icon [icon]="Edit02Icon" size="14" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+                  <span>Edit</span>
+                </button>
+
+                <button
+                  type="button"
+                  class="btn-assign-row"
+                  (click)="openAssignModal(course)"
+                  aria-label="Assign course to employee or intern"
+                  title="Assign to Learner"
+                >
+                  <hugeicons-icon [icon]="UserGroupIcon" size="14" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+                  <span>Assign</span>
+                </button>
+              </div>
             </td>
           </tr>
         </tbody>
@@ -226,7 +278,7 @@
   <div class="modal-backdrop" *ngIf="showCourseModal()" (keydown.escape)="closeCourseModal()">
     <div class="modal-card modal-lg" role="dialog" aria-modal="true" aria-labelledby="modalAddCourseTitle">
       <div class="modal-header">
-        <h2 id="modalAddCourseTitle">Create New LMS Course</h2>
+        <h2 id="modalAddCourseTitle">{{ editingCourseId() ? 'Edit LMS Course' : 'Create New LMS Course' }}</h2>
         <button type="button" class="close-btn" (click)="closeCourseModal()" aria-label="Close modal">
           <hugeicons-icon [icon]="Cancel01Icon" size="18" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
         </button>
@@ -262,6 +314,76 @@
               <option value="Product">Product</option>
               <option value="Compliance">Compliance</option>
             </select>
+          </div>
+
+          <!-- Audience / Visibility Options -->
+          <div class="form-group full-width">
+            <label>Audience & Access Scope *</label>
+            <div class="visibility-options-grid" role="radiogroup" aria-label="Select course visibility">
+              <label class="visibility-radio-card" [class.selected]="newCourse.visibility === 'all'">
+                <input
+                  type="radio"
+                  name="visibilityOption"
+                  value="all"
+                  [(ngModel)]="newCourse.visibility"
+                />
+                <div class="radio-card-content">
+                  <div class="radio-card-header">
+                    <hugeicons-icon [icon]="Globe02Icon" size="16" [strokeWidth]="2" color="currentColor"></hugeicons-icon>
+                    <strong>Overall Public</strong>
+                  </div>
+                  <p>Visible automatically to all employees and interns without manual assignment.</p>
+                </div>
+              </label>
+
+              <label class="visibility-radio-card" [class.selected]="newCourse.visibility === 'interns'">
+                <input
+                  type="radio"
+                  name="visibilityOption"
+                  value="interns"
+                  [(ngModel)]="newCourse.visibility"
+                />
+                <div class="radio-card-content">
+                  <div class="radio-card-header">
+                    <hugeicons-icon [icon]="UserGroupIcon" size="16" [strokeWidth]="2" color="currentColor"></hugeicons-icon>
+                    <strong>Public to Interns</strong>
+                  </div>
+                  <p>Visible automatically to all active interns without manual assignment.</p>
+                </div>
+              </label>
+
+              <label class="visibility-radio-card" [class.selected]="newCourse.visibility === 'employees'">
+                <input
+                  type="radio"
+                  name="visibilityOption"
+                  value="employees"
+                  [(ngModel)]="newCourse.visibility"
+                />
+                <div class="radio-card-content">
+                  <div class="radio-card-header">
+                    <hugeicons-icon [icon]="UserGroupIcon" size="16" [strokeWidth]="2" color="currentColor"></hugeicons-icon>
+                    <strong>Public to Employees</strong>
+                  </div>
+                  <p>Visible automatically to all active employees without manual assignment.</p>
+                </div>
+              </label>
+
+              <label class="visibility-radio-card" [class.selected]="newCourse.visibility === 'private'">
+                <input
+                  type="radio"
+                  name="visibilityOption"
+                  value="private"
+                  [(ngModel)]="newCourse.visibility"
+                />
+                <div class="radio-card-content">
+                  <div class="radio-card-header">
+                    <hugeicons-icon [icon]="LicenseDraftIcon" size="16" [strokeWidth]="2" color="currentColor"></hugeicons-icon>
+                    <strong>Assigned Only (Private)</strong>
+                  </div>
+                  <p>Visible only to learners explicitly assigned by HR.</p>
+                </div>
+              </label>
+            </div>
           </div>
 
           <div class="form-group full-width">
@@ -376,7 +498,7 @@
       <div class="modal-footer">
         <button type="button" class="btn-cancel" (click)="closeCourseModal()" [disabled]="isSaving()">Cancel</button>
         <button type="button" class="btn-save" (click)="saveCourse()" [disabled]="isSaving()">
-          {{ isSaving() ? 'Saving Course...' : 'Create Course' }}
+          {{ isSaving() ? (editingCourseId() ? 'Saving Changes...' : 'Saving Course...') : (editingCourseId() ? 'Update Course' : 'Create Course') }}
         </button>
       </div>
     </div>
@@ -401,9 +523,20 @@
           <div class="summary-details">
             <span class="summary-title">{{ selectedCourseForAssign()?.title }}</span>
             <span class="summary-meta">
-              {{ selectedCourseForAssign()?.code }} &bull; {{ selectedCourseForAssign()?.videos?.length || 0 }} Lessons
+              {{ selectedCourseForAssign()?.code }} &bull; {{ selectedCourseForAssign()?.videos?.length || 0 }} Lessons &bull; {{ getVisibilityLabel(selectedCourseForAssign()?.visibility || 'all') }}
             </span>
           </div>
+        </div>
+
+        <!-- Public Course Notice -->
+        <div
+          class="public-course-notice"
+          *ngIf="selectedCourseForAssign() && (selectedCourseForAssign()?.visibility || 'all') !== 'private'"
+        >
+          <hugeicons-icon [icon]="Globe02Icon" size="16" [strokeWidth]="1.5" color="currentColor"></hugeicons-icon>
+          <p>
+            <strong>Note:</strong> This course is already set to <em>{{ getVisibilityLabel(selectedCourseForAssign()?.visibility || 'all') }}</em>. Eligible learners have automatic access in LMS without needing manual assignment.
+          </p>
         </div>
 
         <!-- Learner Role Type Toggle -->

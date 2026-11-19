@@ -16,6 +16,7 @@ async function ensureSoftrateNewbieCourse(LMSCourse, companyId) {
       code: 'SR-NEWBIE',
       description: 'Foundational onboarding and engineering standards training for new members.',
       category: 'Onboarding',
+      visibility: 'all',
       status: 'active',
       videos: [
         {
@@ -150,10 +151,25 @@ exports.createCourse = async (req, res) => {
   try {
     const { LMSCourse } = req.models;
     const companyId = req.user.companyId;
-    let { title, code, description, category, bannerUrl, thumbnailUrl, videos } = req.body;
+    let { title, code, description, category, bannerUrl, thumbnailUrl, videos, visibility } = req.body;
 
     if (!title) {
       return res.status(400).json({ success: false, message: 'Course title is required' });
+    }
+
+    // Normalize course visibility
+    let normalizedVisibility = 'all';
+    if (visibility) {
+      const v = String(visibility).toLowerCase().trim();
+      if (['intern', 'interns', 'public_intern', 'public_to_intern'].includes(v)) {
+        normalizedVisibility = 'interns';
+      } else if (['employee', 'employees', 'public_employee', 'public_to_employee'].includes(v)) {
+        normalizedVisibility = 'employees';
+      } else if (['private', 'assigned', 'assigned_only'].includes(v)) {
+        normalizedVisibility = 'private';
+      } else {
+        normalizedVisibility = 'all';
+      }
     }
 
     // Parse stringified videos array if sent via FormData
@@ -208,6 +224,7 @@ exports.createCourse = async (req, res) => {
       category: category || 'Onboarding',
       bannerUrl: bannerUrl || thumbnailUrl || '',
       thumbnailUrl: thumbnailUrl || bannerUrl || '',
+      visibility: normalizedVisibility,
       status: 'active',
       videos: processedVideos,
     });
@@ -216,6 +233,139 @@ exports.createCourse = async (req, res) => {
       success: true,
       message: 'Course created successfully',
       data: newCourse,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Update Course Visibility
+exports.updateCourseVisibility = async (req, res) => {
+  try {
+    const { LMSCourse } = req.models;
+    const companyId = req.user.companyId;
+    const { courseId } = req.params;
+    let { visibility } = req.body;
+
+    const course = await LMSCourse.findOne({ _id: courseId, companyId });
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    let normalizedVisibility = 'all';
+    if (visibility) {
+      const v = String(visibility).toLowerCase().trim();
+      if (['intern', 'interns', 'public_intern', 'public_to_intern'].includes(v)) {
+        normalizedVisibility = 'interns';
+      } else if (['employee', 'employees', 'public_employee', 'public_to_employee'].includes(v)) {
+        normalizedVisibility = 'employees';
+      } else if (['private', 'assigned', 'assigned_only'].includes(v)) {
+        normalizedVisibility = 'private';
+      } else {
+        normalizedVisibility = 'all';
+      }
+    }
+
+    course.visibility = normalizedVisibility;
+    await course.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Course visibility updated successfully',
+      data: course,
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+// Full Course Update (Title, Code, Category, Description, Visibility, Videos, Banner)
+exports.updateCourse = async (req, res) => {
+  try {
+    const { LMSCourse } = req.models;
+    const companyId = req.user.companyId;
+    const { courseId } = req.params;
+    let { title, code, description, category, bannerUrl, thumbnailUrl, videos, visibility, status } = req.body;
+
+    const course = await LMSCourse.findOne({ _id: courseId, companyId });
+    if (!course) {
+      return res.status(404).json({ success: false, message: 'Course not found' });
+    }
+
+    if (title) course.title = title.trim();
+    if (code) course.code = code.trim();
+    if (description !== undefined) course.description = description;
+    if (category) course.category = category;
+    if (status) course.status = status;
+
+    if (visibility) {
+      const v = String(visibility).toLowerCase().trim();
+      if (['intern', 'interns', 'public_intern', 'public_to_intern'].includes(v)) {
+        course.visibility = 'interns';
+      } else if (['employee', 'employees', 'public_employee', 'public_to_employee'].includes(v)) {
+        course.visibility = 'employees';
+      } else if (['private', 'assigned', 'assigned_only'].includes(v)) {
+        course.visibility = 'private';
+      } else {
+        course.visibility = 'all';
+      }
+    }
+
+    // Parse stringified videos array if sent via FormData
+    if (typeof videos === 'string') {
+      try {
+        videos = JSON.parse(videos);
+      } catch {
+        // preserve existing if parse fails
+      }
+    }
+
+    // Process uploaded banner file if provided
+    if (req.file) {
+      const ext = path.extname(req.file.originalname) || '.png';
+      const fileName = `course_${Date.now()}_${Math.random().toString(36).substring(7)}${ext}`;
+      const uploadDir = path.join(__dirname, '../public/uploads/lms');
+      if (!fs.existsSync(uploadDir)) {
+        fs.mkdirSync(uploadDir, { recursive: true });
+      }
+      fs.writeFileSync(path.join(uploadDir, fileName), req.file.buffer);
+      course.bannerUrl = `/uploads/lms/${fileName}`;
+      course.thumbnailUrl = `/uploads/lms/${fileName}`;
+    } else if (bannerUrl !== undefined) {
+      course.bannerUrl = bannerUrl;
+      course.thumbnailUrl = bannerUrl;
+    }
+
+    if (Array.isArray(videos)) {
+      course.videos = videos.map((v, idx) => {
+        let youtubeVideoId = v.youtubeVideoId || '';
+        if (!youtubeVideoId && v.youtubeUrl) {
+          const match = v.youtubeUrl.match(/(?:youtu\.be\/|youtube\.com\/(?:embed\/|v\/|watch\?v=|watch\?.+&v=))([\w-]{11})/);
+          youtubeVideoId = match ? match[1] : v.youtubeUrl;
+        }
+        return {
+          order: v.order || idx + 1,
+          title: v.title || `Lesson ${idx + 1}`,
+          description: v.description || '',
+          youtubeUrl: v.youtubeUrl || '',
+          youtubeVideoId,
+          durationSeconds: v.durationSeconds || 0,
+          rules: {
+            deadlineDays: Number(v.deadlineDays || v.rules?.deadlineDays) || 3,
+            unlockType: v.unlockType || v.rules?.unlockType || 'sequential',
+            minWatchPercentage: v.rules?.minWatchPercentage || 90,
+            preventSeekForward: v.rules?.preventSeekForward !== false,
+          },
+        };
+      });
+    }
+
+    await course.save();
+
+    return res.status(200).json({
+      success: true,
+      message: 'Course updated successfully',
+      data: course,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
@@ -431,7 +581,7 @@ exports.getUserCourses = async (req, res) => {
   }
 };
 
-// Fetch courses mapped to the logged-in user
+// Fetch courses mapped to the logged-in user (including public courses for interns/employees)
 exports.getMyCourses = async (req, res) => {
   try {
     const { LMSCourse, LMSEnrollment } = req.models;
@@ -441,31 +591,76 @@ exports.getMyCourses = async (req, res) => {
     // Ensure "Softrate newbie" exists
     const defaultCourse = await ensureSoftrateNewbieCourse(LMSCourse, companyId);
 
-    // Find enrollments for this user
+    // Determine user role (intern vs employee vs manager vs hr)
+    const userRole = (req.user.role || '').toLowerCase();
+    const userRoleName = (req.user.roleName || '').toUpperCase();
+    let isIntern = userRole === 'intern' || userRoleName === 'INTERN';
+    let isEmployee = userRole === 'employee' || userRole === 'manager' || userRoleName === 'EMPLOYEE' || userRoleName === 'MANAGER';
+
+    if (!isIntern && req.models?.Intern) {
+      isIntern = !!(await req.models.Intern.exists({ _id: userId }));
+    }
+    if (!isEmployee && !isIntern && req.models?.Employee) {
+      isEmployee = !!(await req.models.Employee.exists({ _id: userId }));
+    }
+
+    // Role-based visibility matching
+    const visibilityConditions = ['all'];
+    if (isIntern) {
+      visibilityConditions.push('interns');
+    }
+    if (isEmployee || (!isIntern && !isEmployee)) {
+      visibilityConditions.push('employees');
+    }
+    if (userRole === 'hr' || userRoleName === 'HR' || userRole === 'admin' || userRoleName === 'ADMIN') {
+      visibilityConditions.push('interns', 'employees');
+    }
+
+    // Fetch active courses matching user's visibility
+    const publicCourses = await LMSCourse.find({
+      companyId,
+      status: 'active',
+      $or: [
+        { visibility: { $in: visibilityConditions } },
+        { _id: defaultCourse._id }
+      ],
+    });
+
+    // Find existing enrollments for this user
     let enrollments = await LMSEnrollment.find({
       companyId,
       userId,
     }).populate('courseId');
 
-    // Auto-map "Softrate newbie" if user has no enrollments yet (so they can test immediately)
-    if (enrollments.length === 0 && defaultCourse) {
-      const initialProgress = buildInitialVideoProgress(defaultCourse.videos);
-      const newEnrollment = await LMSEnrollment.create({
-        companyId,
-        courseId: defaultCourse._id,
-        userId,
-        userType: req.user.role || 'employee',
-        userEmail: req.user.email || '',
-        userName: req.user.name || '',
-        assignedBy: req.user.id,
-        assignedAt: new Date(),
-        status: 'enrolled',
-        progressPercentage: 0,
-        videosProgress: initialProgress,
-      });
+    const enrolledCourseIds = new Set(
+      enrollments
+        .filter((e) => e.courseId)
+        .map((e) => e.courseId._id.toString())
+    );
 
-      newEnrollment.courseId = defaultCourse;
-      enrollments = [newEnrollment];
+    // Auto-enroll user into public courses without requiring manual HR assignment
+    for (const pubCourse of publicCourses) {
+      const courseIdStr = pubCourse._id.toString();
+      if (!enrolledCourseIds.has(courseIdStr)) {
+        const initialProgress = buildInitialVideoProgress(pubCourse.videos);
+        const newEnrollment = await LMSEnrollment.create({
+          companyId,
+          courseId: pubCourse._id,
+          userId,
+          userType: isIntern ? 'intern' : (req.user.role || 'employee'),
+          userEmail: req.user.email || '',
+          userName: req.user.name || '',
+          assignedBy: req.user.id,
+          assignedAt: new Date(),
+          status: 'enrolled',
+          progressPercentage: 0,
+          videosProgress: initialProgress,
+        });
+
+        newEnrollment.courseId = pubCourse;
+        enrollments.push(newEnrollment);
+        enrolledCourseIds.add(courseIdStr);
+      }
     }
 
     // Format response
@@ -505,6 +700,8 @@ exports.getMyCourses = async (req, res) => {
           code: course.code,
           description: course.description,
           category: course.category,
+          visibility: course.visibility || 'all',
+          isSuggested: ['all', 'interns', 'employees'].includes(course.visibility || 'all'),
           bannerUrl: banner,
           thumbnailUrl: banner,
           assignedAt: enrollment.assignedAt,
@@ -599,6 +796,7 @@ exports.getCourseTimeline = async (req, res) => {
           code: course.code,
           description: course.description,
           category: course.category,
+          visibility: course.visibility || 'all',
         },
         enrollment: {
           id: enrollment._id,

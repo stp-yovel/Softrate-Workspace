@@ -122,6 +122,9 @@ export class CampusHiringComponent implements OnInit {
   isUpdatingCollege = signal<boolean>(false);
   showAddYearModal = signal<boolean>(false);
   showCreateDriveModal = signal<boolean>(false);
+  showEditDriveModal = signal<boolean>(false);
+  isUpdatingDrive = signal<boolean>(false);
+  editingDriveId = signal<string | null>(null);
   showExcelImportModal = signal<boolean>(false);
   showStudentDetailsModal = signal<boolean>(false);
   selectedStudent = signal<any | null>(null);
@@ -1019,6 +1022,107 @@ export class CampusHiringComponent implements OnInit {
       error: (err) => {
         this.isLoading.set(false);
         this.alertService.show(err.error?.message || 'Error creating campus drive');
+      }
+    });
+  }
+
+  // ==========================================
+  // EDIT CAMPUS DRIVE MODAL
+  // ==========================================
+  openEditDriveModal(drive: any, event?: Event): void {
+    if (event) event.stopPropagation();
+    this.editingDriveId.set(drive._id);
+
+    const formatToDateInput = (val: any) => {
+      if (!val) return '';
+      const d = new Date(val);
+      if (isNaN(d.getTime())) return '';
+      return d.toISOString().split('T')[0];
+    };
+
+    this.driveForm = {
+      title: drive.title || '',
+      academicYear: drive.academicYear || this.selectedAcademicYear() || '',
+      roles: Array.isArray(drive.roles) ? [...drive.roles] : [],
+      startDate: formatToDateInput(drive.startDate),
+      endDate: formatToDateInput(drive.endDate),
+      description: drive.description || '',
+      rounds: Array.isArray(drive.rounds) && drive.rounds.length > 0 
+        ? JSON.parse(JSON.stringify(drive.rounds))
+        : [
+            { roundId: 'r_resume', name: 'Project Shortlisting from Resume', order: 1, isActive: true },
+            { roundId: 'r_aptitude', name: 'Aptitude Test', order: 2, isActive: true },
+            { roundId: 'r_gd', name: 'Group Discussion', order: 3, isActive: true },
+            { roundId: 'r_interview', name: 'One-to-One Interview', order: 4, isActive: true },
+            { roundId: 'r_task', name: 'Technical Task / Test', order: 5, isActive: true }
+          ]
+    };
+    this.customRoundName.set('');
+    this.loadHireProExams();
+    this.showEditDriveModal.set(true);
+  }
+
+  closeEditDriveModal(): void {
+    this.showEditDriveModal.set(false);
+    this.editingDriveId.set(null);
+  }
+
+  submitUpdateDrive(): void {
+    const driveId = this.editingDriveId();
+    if (!driveId) return;
+
+    if (!this.driveForm.title || !this.driveForm.startDate || !this.driveForm.endDate) {
+      this.alertService.show('Drive Title, Start Date, and End Date are required.');
+      return;
+    }
+    if (this.driveForm.roles.length === 0) {
+      this.alertService.show('Please select at least one role for this campus drive.');
+      return;
+    }
+
+    const payload = {
+      academicYear: this.driveForm.academicYear,
+      title: this.driveForm.title,
+      roles: this.driveForm.roles,
+      startDate: this.driveForm.startDate,
+      endDate: this.driveForm.endDate,
+      description: this.driveForm.description,
+      rounds: this.driveForm.rounds
+    };
+
+    this.isUpdatingDrive.set(true);
+    this.apiService.updateCampusDrive(driveId, payload).subscribe({
+      next: (res) => {
+        this.isUpdatingDrive.set(false);
+        this.closeEditDriveModal();
+        this.alertService.show('Campus Drive updated successfully!');
+
+        // Update selectedDrive if currently viewing details
+        if (this.selectedDrive() && this.selectedDrive()._id === driveId) {
+          this.selectedDrive.update(d => ({ ...d, ...res.drive }));
+        }
+
+        // Refresh current college to update drive lists
+        const college = this.selectedCollege();
+        if (college) {
+          const keepLevel = this.currentLevel();
+          const activeYear = this.driveForm.academicYear || this.selectedAcademicYear();
+          this.apiService.getCollegeById(college._id).subscribe({
+            next: (c) => {
+              this.selectedCollege.set(c);
+              if (activeYear) {
+                this.selectedAcademicYear.set(activeYear);
+              }
+              if (keepLevel === 'drives-list' || keepLevel === 'drive-detail') {
+                this.currentLevel.set(keepLevel);
+              }
+            }
+          });
+        }
+      },
+      error: (err) => {
+        this.isUpdatingDrive.set(false);
+        this.alertService.show(err.error?.message || 'Error updating campus drive');
       }
     });
   }

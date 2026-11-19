@@ -12,6 +12,8 @@ import {
   CheckmarkCircle02Icon,
   Cancel01Icon,
   Search01Icon,
+  Globe02Icon,
+  Edit02Icon,
 } from '@hugeicons/core-free-icons';
 
 @Component({
@@ -33,6 +35,8 @@ export class LMSCourses implements OnInit {
   CheckmarkCircle02Icon = CheckmarkCircle02Icon;
   Cancel01Icon = Cancel01Icon;
   Search01Icon = Search01Icon;
+  Globe02Icon = Globe02Icon;
+  Edit02Icon = Edit02Icon;
 
   courses = signal<any[]>([]);
   isLoading = signal(false);
@@ -80,6 +84,7 @@ export class LMSCourses implements OnInit {
 
   // Course Modal
   showCourseModal = signal(false);
+  editingCourseId = signal<string | null>(null);
   selectedBannerFile = signal<File | null>(null);
   bannerPreview = signal<string>('');
   newCourse = {
@@ -87,6 +92,7 @@ export class LMSCourses implements OnInit {
     code: '',
     category: 'Onboarding',
     description: '',
+    visibility: 'all',
     videos: [
       {
         title: '',
@@ -137,6 +143,7 @@ export class LMSCourses implements OnInit {
   }
 
   openAddCourseModal() {
+    this.editingCourseId.set(null);
     this.selectedBannerFile.set(null);
     this.bannerPreview.set('');
     this.newCourse = {
@@ -144,6 +151,7 @@ export class LMSCourses implements OnInit {
       code: `CRS-${Math.floor(1000 + Math.random() * 9000)}`,
       category: 'Onboarding',
       description: '',
+      visibility: 'all',
       videos: [
         {
           title: '',
@@ -153,6 +161,42 @@ export class LMSCourses implements OnInit {
         },
       ],
     };
+    this.errorMsg.set('');
+    this.successMsg.set('');
+    this.showCourseModal.set(true);
+  }
+
+  openEditCourseModal(course: any) {
+    if (!course) return;
+    this.editingCourseId.set(course._id || course.id);
+    this.selectedBannerFile.set(null);
+    this.bannerPreview.set(this.getCourseBannerUrl(course));
+
+    const lessons = (course.videos && course.videos.length > 0)
+      ? course.videos.map((v: any) => ({
+          title: v.title || '',
+          youtubeUrl: v.youtubeUrl || '',
+          deadlineDays: v.rules?.deadlineDays || 3,
+          unlockType: v.rules?.unlockType || 'sequential',
+        }))
+      : [
+          {
+            title: '',
+            youtubeUrl: '',
+            deadlineDays: 3,
+            unlockType: 'sequential',
+          },
+        ];
+
+    this.newCourse = {
+      title: course.title || '',
+      code: course.code || '',
+      category: course.category || 'Onboarding',
+      description: course.description || '',
+      visibility: course.visibility || 'all',
+      videos: lessons,
+    };
+
     this.errorMsg.set('');
     this.successMsg.set('');
     this.showCourseModal.set(true);
@@ -171,6 +215,7 @@ export class LMSCourses implements OnInit {
   }
 
   closeCourseModal() {
+    this.editingCourseId.set(null);
     this.selectedBannerFile.set(null);
     this.bannerPreview.set('');
     this.showCourseModal.set(false);
@@ -212,18 +257,20 @@ export class LMSCourses implements OnInit {
       },
     }));
 
+    const isEdit = !!this.editingCourseId();
     const onComplete = {
       next: () => {
         this.isSaving.set(false);
         this.showCourseModal.set(false);
         this.selectedBannerFile.set(null);
         this.bannerPreview.set('');
-        this.successMsg.set('Course created successfully with banner!');
+        this.editingCourseId.set(null);
+        this.successMsg.set(isEdit ? 'Course updated successfully!' : 'Course created successfully with banner!');
         this.fetchCourses();
       },
       error: (err: any) => {
         this.isSaving.set(false);
-        this.errorMsg.set(err?.error?.message || 'Failed to save course.');
+        this.errorMsg.set(err?.error?.message || (isEdit ? 'Failed to update course.' : 'Failed to save course.'));
       },
     };
 
@@ -233,16 +280,52 @@ export class LMSCourses implements OnInit {
       formData.append('code', this.newCourse.code.trim());
       formData.append('category', this.newCourse.category);
       formData.append('description', this.newCourse.description);
+      formData.append('visibility', this.newCourse.visibility);
       formData.append('banner', this.selectedBannerFile()!);
       formData.append('videos', JSON.stringify(formattedVideos));
-      this.apiService.createLMSCourse(formData).subscribe(onComplete);
+      if (isEdit) {
+        this.apiService.updateLMSCourse(this.editingCourseId()!, formData).subscribe(onComplete);
+      } else {
+        this.apiService.createLMSCourse(formData).subscribe(onComplete);
+      }
     } else {
       const payload = {
         ...this.newCourse,
         videos: formattedVideos,
       };
-      this.apiService.createLMSCourse(payload).subscribe(onComplete);
+      if (isEdit) {
+        this.apiService.updateLMSCourse(this.editingCourseId()!, payload).subscribe(onComplete);
+      } else {
+        this.apiService.createLMSCourse(payload).subscribe(onComplete);
+      }
     }
+  }
+
+  getVisibilityLabel(visibility: string): string {
+    switch (visibility) {
+      case 'interns':
+        return 'Public to Interns';
+      case 'employees':
+        return 'Public to Employees';
+      case 'private':
+        return 'Assigned Only';
+      case 'all':
+      default:
+        return 'Overall Public';
+    }
+  }
+
+  updateVisibility(course: any, newVisibility: string) {
+    if (!course || !course._id || course.visibility === newVisibility) return;
+    this.apiService.updateLMSCourseVisibility(course._id, newVisibility).subscribe({
+      next: () => {
+        course.visibility = newVisibility;
+        this.successMsg.set(`Audience access updated to "${this.getVisibilityLabel(newVisibility)}".`);
+      },
+      error: (err: any) => {
+        this.errorMsg.set(err?.error?.message || 'Failed to update visibility.');
+      },
+    });
   }
 
   openAssignModal(course: any) {

@@ -70,9 +70,13 @@ exports.applyToWalkinDrive = async (req, res) => {
     let projectLinks = [];
     try {
       if (projectLinksRaw) {
-        const parsed = JSON.parse(projectLinksRaw);
-        if (Array.isArray(parsed)) {
-          projectLinks = parsed.filter(l => l && l.trim()).slice(0, 5);
+        if (Array.isArray(projectLinksRaw)) {
+          projectLinks = projectLinksRaw.filter(l => l && typeof l === 'string' && l.trim()).slice(0, 5);
+        } else if (typeof projectLinksRaw === 'string') {
+          const parsed = JSON.parse(projectLinksRaw);
+          if (Array.isArray(parsed)) {
+            projectLinks = parsed.filter(l => l && typeof l === 'string' && l.trim()).slice(0, 5);
+          }
         }
       }
     } catch (_) { projectLinks = []; }

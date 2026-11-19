@@ -322,6 +322,21 @@ toggleRemoteAccess() {
   });
 }
 
+toggleWebAccess() {
+  const isNowWebAccess = !this.employee().webAccess;
+  this.apiService.updateEmployee(this.employeeId(), { webAccess: isNowWebAccess }).subscribe({
+    next: () => {
+      this.alertService.show(`Web access ${isNowWebAccess ? 'enabled' : 'disabled'}`);
+      this.fetchDetails();
+    },
+    error: (err: any) => {
+      console.error('Failed to update web access', err);
+      const errMsg = err?.error?.message || err?.message || 'Unknown error';
+      this.alertService.show(`Failed to update web access: ${errMsg}`);
+    }
+  });
+}
+
   async terminateEmployee() {
   if (!this.terminationReason().trim()) {
     this.alertService.show("Please provide a reason for termination.");

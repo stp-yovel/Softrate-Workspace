@@ -16,6 +16,8 @@ router.use(verifyTenant);
 router.post('/seed', lmsController.seedDefaultCourse);
 router.get('/courses', lmsController.getAllCourses);
 router.post('/courses', upload.single('banner'), lmsController.createCourse);
+router.put('/courses/:courseId', upload.single('banner'), lmsController.updateCourse);
+router.patch('/courses/:courseId/visibility', lmsController.updateCourseVisibility);
 
 // HR Mapping
 router.post('/assign', lmsController.assignCourse);
