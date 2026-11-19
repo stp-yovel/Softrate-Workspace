@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 /**
- * Migration Script: Migrate Candidates from Play Store Mobile App Onboarding
+ * Migration Script: Migrate Candidates from Play Store Mobile App Onboarding (code: JCE)
  * (hrdb_jerusalem.interns) -> (hrdb_softrateglobalcom.campusstudents)
  *
  * Usage:
