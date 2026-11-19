@@ -2,6 +2,8 @@ const express = require('express');
 const router = express.Router();
 const mongoose = require('mongoose');
 const verifyPublicTenant = require('../middleware/publicTenant.middleware');
+const { getMasterConnection, waitForConnection } = require('../db');
+const CompanyModelExport = require('../models/CompanyModel');
 
 // Ensure permissive CORS on all public routes for careers website, embeds, etc.
 router.use((req, res, next) => {
@@ -14,6 +16,66 @@ router.use((req, res, next) => {
     return res.sendStatus(200);
   }
   next();
+});
+
+/**
+ * @route GET /api/public/companies
+ * @desc Get all public companies available for mobile app suggestions dropdown
+ * @access Public
+ */
+router.get('/companies', async (req, res) => {
+  try {
+    const masterDb = getMasterConnection();
+    await waitForConnection(masterDb);
+    const MasterCompany = masterDb.models.Company || masterDb.model('Company', CompanyModelExport.schema);
+
+    const allCompanies = await MasterCompany.find({}, 'name companyCode logo settings.showInRegistrationDropdown');
+    const publicList = allCompanies
+      .filter(c => {
+        if (!c.companyCode) return false;
+        const show = c.settings?.showInRegistrationDropdown;
+        return show !== false;
+      })
+      .map(c => ({
+        id: c._id,
+        name: c.name,
+        companyCode: c.companyCode,
+        logo: c.logo || null
+      }));
+
+    res.json(publicList);
+  } catch (error) {
+    console.error('Error fetching public companies for mobile:', error);
+    res.status(500).json({ success: false, msg: 'Server error' });
+  }
+});
+
+// Alias for parity
+router.get('/public-companies', async (req, res) => {
+  try {
+    const masterDb = getMasterConnection();
+    await waitForConnection(masterDb);
+    const MasterCompany = masterDb.models.Company || masterDb.model('Company', CompanyModelExport.schema);
+
+    const allCompanies = await MasterCompany.find({}, 'name companyCode logo settings.showInRegistrationDropdown');
+    const publicList = allCompanies
+      .filter(c => {
+        if (!c.companyCode) return false;
+        const show = c.settings?.showInRegistrationDropdown;
+        return show !== false;
+      })
+      .map(c => ({
+        id: c._id,
+        name: c.name,
+        companyCode: c.companyCode,
+        logo: c.logo || null
+      }));
+
+    res.json(publicList);
+  } catch (error) {
+    console.error('Error fetching public companies:', error);
+    res.status(500).json({ success: false, msg: 'Server error' });
+  }
 });
 
 // We use the tenant context to fetch from the correct DB
