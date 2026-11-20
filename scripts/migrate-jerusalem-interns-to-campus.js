@@ -4,6 +4,13 @@
  * Migration Script: Migrate Candidates from Play Store Mobile App Onboarding (code: JCE)
  * (hrdb_jerusalem.interns) -> (hrdb_softrateglobalcom.campusstudents)
  *
+ * MAPPING STRATEGY:
+ * 1. Match by Email (case-insensitive, trimmed)
+ * 2. Fallback: Match by Phone (last 10 digits) to link students who used personal Gmail
+ * 3. Fallback: Match by Roll Number
+ * 4. Existing students are updated with isFormSubmitted: true, resume, project links, assessment answers
+ * 5. Non-matching students (e.g. AI & DS students not in initial roster) are inserted as new candidates
+ *
  * Usage:
  *   node scripts/migrate-jerusalem-interns-to-campus.js
  */
@@ -31,12 +38,41 @@ function getTenantUri(rawUri, dbName) {
     url.pathname = `/${dbName}`;
     return url.toString();
   } catch (e) {
-    // Fallback if URL parsing fails on mongodb+srv
     const [base, query] = rawUri.split('?');
     const cleanBase = base.replace(/\/+$/, '');
     const prefix = cleanBase.substring(0, cleanBase.lastIndexOf('/') + 1);
     return `${prefix}${dbName}${query ? '?' + query : ''}`;
   }
+}
+
+function cleanPhone(phone) {
+  if (!phone) return '';
+  return phone.toString().replace(/\D/g, '').slice(-10);
+}
+
+function parseProjectLinks(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(l => l && typeof l === 'string' && l.trim()).slice(0, 5);
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return parsed.filter(l => l && typeof l === 'string' && l.trim()).slice(0, 5);
+    } catch (_) {}
+    if (raw.startsWith('http')) return [raw.trim()];
+  }
+  return [];
+}
+
+function parseAssessmentAnswers(raw) {
+  if (!raw) return {};
+  if (typeof raw === 'object' && !Array.isArray(raw)) return raw;
+  if (typeof raw === 'string') {
+    try {
+      const parsed = JSON.parse(raw);
+      if (typeof parsed === 'object' && parsed !== null) return parsed;
+    } catch (_) {}
+  }
+  return {};
 }
 
 async function runMigration() {
@@ -81,8 +117,11 @@ async function runMigration() {
     order: 1
   };
 
-  // Fetch all interns registered under Jerusalem
-  const interns = await jerusalemInternsColl.find({}).toArray();
+  // Fetch all interns from hrdb_jerusalem (filter out any test accounts)
+  const interns = await jerusalemInternsColl.find({
+    email: { $not: /yovel/i },
+    fullName: { $not: /yovel/i }
+  }).toArray();
   console.log(`📋 Total candidates in hrdb_jerusalem.interns: ${interns.length}`);
 
   if (interns.length === 0) {
@@ -92,71 +131,105 @@ async function runMigration() {
     process.exit(0);
   }
 
-  let insertedCount = 0;
-  let updatedCount = 0;
-  let skippedCount = 0;
+  // Fetch all existing students in this drive
+  const existingCampusStudents = await campusStudentsColl.find({ driveId: drive._id }).toArray();
+  console.log(`📚 Existing students in Campus Drive: ${existingCampusStudents.length}`);
+
+  // Build lookup maps
+  const existingByEmail = new Map();
+  const existingByPhone = new Map();
+  const existingByRoll = new Map();
+
+  existingCampusStudents.forEach(s => {
+    if (s.email) existingByEmail.set(s.email.trim().toLowerCase(), s);
+    const p = cleanPhone(s.phone);
+    if (p) existingByPhone.set(p, s);
+    if (s.rollNumber) existingByRoll.set(s.rollNumber.trim(), s);
+  });
+
+  let matchedByEmailCount = 0;
+  let matchedByPhoneCount = 0;
+  let matchedByRollCount = 0;
+  let newlyInsertedCount = 0;
 
   for (const intern of interns) {
-    const email = (intern.email || '').trim().toLowerCase();
-    const phone = (intern.contact || intern.phone || '').trim();
-    const fullName = (intern.fullName || intern.name || '').trim();
-    // Use rollNumber if present, or internId, or fallback to phone
-    const rollNumber = (intern.rollNumber || intern.internid || intern.internId || phone || email).trim();
+    const internEmail = (intern.email || '').trim().toLowerCase();
+    const internPhone = (intern.contact || intern.phone || '').trim();
+    const internCleanPhone = cleanPhone(internPhone);
+    const internName = (intern.fullName || intern.name || '').trim();
+    const internRoll = (intern.rollNumber || intern.internid || intern.internId || '').trim();
 
-    if (!email || !fullName) {
-      console.warn(`⚠️ Skipping candidate with missing email or name:`, intern._id);
-      skippedCount++;
-      continue;
+    const projectLinks = parseProjectLinks(intern.projectLinks);
+    const assessmentAnswers = parseAssessmentAnswers(intern.assessmentAnswers);
+
+    // 1. Try matching by Email
+    let matchedStudent = existingByEmail.get(internEmail);
+    let matchType = matchedStudent ? 'email' : null;
+
+    // 2. Try matching by Phone
+    if (!matchedStudent && internCleanPhone && existingByPhone.has(internCleanPhone)) {
+      matchedStudent = existingByPhone.get(internCleanPhone);
+      matchType = 'phone';
     }
 
-    // Check if already exists in campusstudents for this drive
-    const existing = await campusStudentsColl.findOne({
-      driveId: drive._id,
-      $or: [
-        { email },
-        { rollNumber }
-      ]
-    });
+    // 3. Try matching by Roll Number
+    if (!matchedStudent && internRoll && existingByRoll.has(internRoll)) {
+      matchedStudent = existingByRoll.get(internRoll);
+      matchType = 'roll';
+    }
 
-    if (existing) {
-      // Update missing fields
-      await campusStudentsColl.updateOne(
-        { _id: existing._id },
-        {
-          $set: {
-            fullName: fullName || existing.fullName,
-            phone: phone || existing.phone,
-            department: intern.department || existing.department,
-            degree: intern.degree || intern.qualification || existing.degree,
-            resumeBase64: intern.resume || existing.resumeBase64,
-            resumeUrl: intern.resumeUrl || existing.resumeUrl,
-            updatedAt: new Date()
-          }
-        }
-      );
-      updatedCount++;
+    if (matchedStudent) {
+      if (matchType === 'email') matchedByEmailCount++;
+      else if (matchType === 'phone') matchedByPhoneCount++;
+      else if (matchType === 'roll') matchedByRollCount++;
+
+      // Update existing student with submitted form data
+      const updateFields = {
+        isFormSubmitted: true,
+        formSubmittedAt: intern.createdAt || new Date(),
+        resumeBase64: intern.resume || matchedStudent.resumeBase64 || '',
+        resumeUrl: intern.resumeUrl || matchedStudent.resumeUrl || '',
+        projectLinks: projectLinks.length > 0 ? projectLinks : matchedStudent.projectLinks || [],
+        assessmentAnswers: Object.keys(assessmentAnswers).length > 0 ? assessmentAnswers : matchedStudent.assessmentAnswers || {},
+        linkedin: intern.linkedin || matchedStudent.linkedin || '',
+        linkedCandidateId: intern._id,
+        updatedAt: new Date()
+      };
+
+      // Enrich personal email / mobile if previously missing
+      if (!matchedStudent.phone && internPhone) updateFields.phone = internPhone;
+      if (!matchedStudent.department && intern.department) updateFields.department = intern.department;
+      if (!matchedStudent.degree && (intern.degree || intern.qualification)) updateFields.degree = intern.degree || intern.qualification;
+
+      await campusStudentsColl.updateOne({ _id: matchedStudent._id }, { $set: updateFields });
     } else {
-      // Insert new Campus Student
-      await campusStudentsColl.insertOne({
+      // New Student (e.g. AI & DS students not in initial roster)
+      const rollNumber = internRoll || (internCleanPhone ? `23033109${internCleanPhone.slice(-6)}` : `JCE_${Date.now()}`);
+
+      const newDoc = {
         driveId: drive._id,
         collegeId: college._id,
         collegeName: college.name,
         rollNumber,
-        fullName,
-        email,
-        phone: phone || '',
-        department: intern.department || '',
-        degree: intern.degree || intern.qualification || '',
+        fullName: internName,
+        email: internEmail,
+        phone: internPhone || '',
+        department: intern.department || 'Computer Science & Engineering',
+        degree: intern.degree || intern.qualification || 'B.E',
         cgpa: intern.cgpa || '',
         appliedRoles: ['Full Stack Developer (MERN)'],
         selectedRole: 'Full Stack Developer (MERN)',
         resumeBase64: intern.resume || '',
         resumeUrl: intern.resumeUrl || '',
+        projectLinks,
+        assessmentAnswers,
+        linkedin: intern.linkedin || '',
+        linkedCandidateId: intern._id,
+        isFormSubmitted: true,
+        formSubmittedAt: intern.createdAt || new Date(),
         currentRoundOrder: firstRound.order,
         currentRoundName: firstRound.name,
         overallStatus: 'Active',
-        isFormSubmitted: true,
-        formSubmittedAt: intern.createdAt || new Date(),
         roundHistory: [
           {
             roundId: firstRound.roundId,
@@ -170,17 +243,33 @@ async function runMigration() {
         companyId: drive.companyId,
         createdAt: intern.createdAt || new Date(),
         updatedAt: new Date()
-      });
-      insertedCount++;
+      };
+
+      await campusStudentsColl.insertOne(newDoc);
+      newlyInsertedCount++;
+
+      // Add to lookup maps so duplicates in this loop are prevented
+      existingByEmail.set(internEmail, newDoc);
+      if (internCleanPhone) existingByPhone.set(internCleanPhone, newDoc);
+      existingByRoll.set(rollNumber, newDoc);
     }
   }
 
-  console.log('\n=============================================');
-  console.log('🎉 Migration Completed Successfully!');
-  console.log(`   - Inserted into Campus Drive: ${insertedCount}`);
-  console.log(`   - Updated existing candidates: ${updatedCount}`);
-  console.log(`   - Skipped invalid rows:       ${skippedCount}`);
-  console.log('=============================================\n');
+  const finalDriveTotal = await campusStudentsColl.countDocuments({ driveId: drive._id });
+  const finalSubmittedTotal = await campusStudentsColl.countDocuments({ driveId: drive._id, isFormSubmitted: true });
+
+  console.log('\n======================================================');
+  console.log('🎉 MIGRATION & CANDIDATE MAPPING COMPLETE!');
+  console.log('======================================================');
+  console.log(`📥 Total Mobile App Applicants Processed: ${interns.length}`);
+  console.log(`   ├─ Mapped to Existing by College Email:  ${matchedByEmailCount}`);
+  console.log(`   ├─ Mapped to Existing by Mobile Number:   ${matchedByPhoneCount}`);
+  console.log(`   ├─ Mapped to Existing by Roll Number:     ${matchedByRollCount}`);
+  console.log(`   └─ Newly Inserted Candidates (e.g. AI&DS): ${newlyInsertedCount}`);
+  console.log('------------------------------------------------------');
+  console.log(`📊 Final Drive Total Students:             ${finalDriveTotal}`);
+  console.log(`✅ Total "Form Submitted" Active Candidates: ${finalSubmittedTotal}`);
+  console.log('======================================================\n');
 
   await jerusalemConn.close();
   await softrateConn.close();
