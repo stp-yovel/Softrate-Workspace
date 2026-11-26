@@ -865,16 +865,18 @@ export class CampusHiringComponent implements OnInit {
   }
 
   getExamMappingForRole(round: IRoundConfig, role: string): string {
-    if (!round.hireProExamMapping) return '';
-    const mapping = round.hireProExamMapping.find(m => m.role === role);
+    if (!round.hireProExamMapping || !Array.isArray(round.hireProExamMapping)) return '';
+    const cleanRole = (role || '').trim().toLowerCase();
+    const mapping = round.hireProExamMapping.find(m => (m.role || '').trim().toLowerCase() === cleanRole);
     return mapping ? mapping.examId : '';
   }
 
   setExamMappingForRole(round: IRoundConfig, role: string, examId: string): void {
-    if (!round.hireProExamMapping) {
+    if (!round.hireProExamMapping || !Array.isArray(round.hireProExamMapping)) {
       round.hireProExamMapping = [];
     }
-    const idx = round.hireProExamMapping.findIndex(m => m.role === role);
+    const cleanRole = (role || '').trim().toLowerCase();
+    const idx = round.hireProExamMapping.findIndex(m => (m.role || '').trim().toLowerCase() === cleanRole);
     const selectedExam = this.hireProExams().find(e => e._id === examId);
     const examTitle = selectedExam ? selectedExam.title : '';
 
@@ -884,6 +886,7 @@ export class CampusHiringComponent implements OnInit {
       } else {
         round.hireProExamMapping[idx].examId = examId;
         round.hireProExamMapping[idx].examTitle = examTitle;
+        round.hireProExamMapping[idx].role = role;
       }
     } else if (examId) {
       round.hireProExamMapping.push({ role, examId, examTitle });

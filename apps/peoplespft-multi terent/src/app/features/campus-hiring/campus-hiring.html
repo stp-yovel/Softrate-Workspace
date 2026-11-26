@@ -1355,7 +1355,7 @@
                     >
                       <option value="">-- Do not send HirePro exam for this role --</option>
                       <option *ngFor="let exam of hireProExams()" [value]="exam._id">
-                        {{ exam.title }} (Duration: {{ exam.duration }}m, Passing: {{ exam.passingPercentage || 60 }}%)
+                        {{ exam.title }} (Duration: {{ exam.totalDuration || exam.duration || 30 }}m, Passing: {{ exam.passingPercentage || 60 }}%)
                       </option>
                     </select>
                   </div>
